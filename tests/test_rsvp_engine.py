@@ -232,7 +232,7 @@ class TestRSVPEngine:
     def test_play_at_end_resets(self, qapp):
         engine = RSVPEngine()
         engine.load_text("one two")
-        engine.seek(2)  # at end
+        engine.seek(1)  # at last word (index 1 of 2 words)
         engine.play()
         assert engine.current_index == 0
 

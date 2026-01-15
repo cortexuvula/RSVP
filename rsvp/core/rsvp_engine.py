@@ -105,7 +105,8 @@ class RSVPEngine(QObject):
         if not self._state.words:
             return
 
-        if self._state.current_index >= len(self._state.words):
+        # Reset to beginning if at or past the last word
+        if self._state.current_index >= len(self._state.words) - 1:
             self._state.current_index = 0
 
         self._state.is_playing = True
