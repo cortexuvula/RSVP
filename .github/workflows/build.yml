@@ -1,0 +1,80 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: RSVP-Reader-Windows
+            artifact_path: dist/RSVP Reader.exe
+          - os: macos-latest
+            artifact_name: RSVP-Reader-macOS
+            artifact_path: dist/RSVP Reader.app
+          - os: ubuntu-latest
+            artifact_name: RSVP-Reader-Linux
+            artifact_path: dist/RSVP Reader
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libxcb-cursor0 \
+            libxkbcommon-x11-0 \
+            libxcb-icccm4 \
+            libxcb-keysyms1 \
+            libxcb-xkb1 \
+            libegl1 \
+            libxcb-shape0 \
+            libxcb-xinerama0
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Build with PyInstaller
+        run: pyinstaller rsvp.spec
+
+      - name: Zip macOS app bundle
+        if: runner.os == 'macOS'
+        run: |
+          cd dist
+          zip -r "RSVP Reader.zip" "RSVP Reader.app"
+
+      - name: Upload artifact (Windows/Linux)
+        if: runner.os != 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
+
+      - name: Upload artifact (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/RSVP Reader.zip
+          if-no-files-found: error
