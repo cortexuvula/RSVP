@@ -6,6 +6,7 @@ from rsvp.core.text_processor import (
     calculate_pause_multiplier,
     process_text,
     extract_text_from_html,
+    load_text_from_file,
 )
 
 
@@ -222,3 +223,36 @@ class TestExtractTextFromHTML:
         text = extract_text_from_html(html)
         assert "Nested" in text
         assert "content" in text
+
+
+class TestLoadTextFromFile:
+    """Tests for load_text_from_file function."""
+
+    def test_load_text_file(self, tmp_path):
+        f = tmp_path / "test.txt"
+        f.write_text("Hello world from file", encoding="utf-8")
+        text = load_text_from_file(str(f))
+        assert text == "Hello world from file"
+
+    def test_load_utf8_file(self, tmp_path):
+        f = tmp_path / "utf8.txt"
+        f.write_text("Héllo wörld", encoding="utf-8")
+        text = load_text_from_file(str(f))
+        assert "Héllo" in text
+
+    def test_load_empty_file(self, tmp_path):
+        f = tmp_path / "empty.txt"
+        f.write_text("", encoding="utf-8")
+        text = load_text_from_file(str(f))
+        assert text == ""
+
+    def test_load_multiline_file(self, tmp_path):
+        f = tmp_path / "multi.txt"
+        f.write_text("Line one\nLine two\nLine three", encoding="utf-8")
+        text = load_text_from_file(str(f))
+        assert "Line one" in text
+        assert "Line three" in text
+
+    def test_load_nonexistent_file(self):
+        with pytest.raises(FileNotFoundError):
+            load_text_from_file("/nonexistent/path/file.txt")

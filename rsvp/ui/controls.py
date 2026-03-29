@@ -33,6 +33,7 @@ class PlaybackControls(QWidget):
         self.prev_sentence_btn.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_MediaSkipBackward))
         self.prev_sentence_btn.setToolTip("Previous sentence (Shift+Left)")
         self.prev_sentence_btn.setFixedSize(40, 40)
+        self.prev_sentence_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.prev_sentence_btn.clicked.connect(self.prev_sentence_clicked.emit)
         layout.addWidget(self.prev_sentence_btn)
 
@@ -41,6 +42,7 @@ class PlaybackControls(QWidget):
         self.skip_back_btn.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_MediaSeekBackward))
         self.skip_back_btn.setToolTip("Skip back 10 words (Left)")
         self.skip_back_btn.setFixedSize(40, 40)
+        self.skip_back_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.skip_back_btn.clicked.connect(self.skip_backward_clicked.emit)
         layout.addWidget(self.skip_back_btn)
 
@@ -49,6 +51,7 @@ class PlaybackControls(QWidget):
         self.play_pause_btn.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
         self.play_pause_btn.setToolTip("Play/Pause (Space)")
         self.play_pause_btn.setFixedSize(50, 50)
+        self.play_pause_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.play_pause_btn.clicked.connect(self._on_play_pause)
         layout.addWidget(self.play_pause_btn)
 
@@ -57,6 +60,7 @@ class PlaybackControls(QWidget):
         self.stop_btn.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_MediaStop))
         self.stop_btn.setToolTip("Stop (S)")
         self.stop_btn.setFixedSize(40, 40)
+        self.stop_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.stop_btn.clicked.connect(self.stop_clicked.emit)
         layout.addWidget(self.stop_btn)
 
@@ -65,6 +69,7 @@ class PlaybackControls(QWidget):
         self.skip_fwd_btn.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_MediaSeekForward))
         self.skip_fwd_btn.setToolTip("Skip forward 10 words (Right)")
         self.skip_fwd_btn.setFixedSize(40, 40)
+        self.skip_fwd_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.skip_fwd_btn.clicked.connect(self.skip_forward_clicked.emit)
         layout.addWidget(self.skip_fwd_btn)
 
@@ -73,6 +78,7 @@ class PlaybackControls(QWidget):
         self.next_sentence_btn.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_MediaSkipForward))
         self.next_sentence_btn.setToolTip("Next sentence (Shift+Right)")
         self.next_sentence_btn.setFixedSize(40, 40)
+        self.next_sentence_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.next_sentence_btn.clicked.connect(self.next_sentence_clicked.emit)
         layout.addWidget(self.next_sentence_btn)
 
@@ -210,12 +216,11 @@ class ProgressWidget(QWidget):
         percent = (self.slider.value() / 1000) * 100
         self.seek_requested.emit(percent)
 
-    def update_progress(self, current: int, total: int, time_remaining: float):
+    def update_progress(self, progress_percent: float, current: int, total: int, time_remaining: float):
         """Update the progress display."""
-        if total > 0:
-            self.slider.blockSignals(True)
-            self.slider.setValue(int((current / total) * 1000))
-            self.slider.blockSignals(False)
+        self.slider.blockSignals(True)
+        self.slider.setValue(int((progress_percent / 100) * 1000))
+        self.slider.blockSignals(False)
 
         self.label.setText(f"{current} / {total} words")
 

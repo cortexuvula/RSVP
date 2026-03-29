@@ -1,11 +1,12 @@
 """Settings dialog."""
+from dataclasses import asdict
+
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
-    QGroupBox, QSpinBox, QLineEdit, QPushButton,
-    QColorDialog, QFontComboBox, QCheckBox, QLabel,
+    QDialog, QVBoxLayout, QFormLayout,
+    QGroupBox, QSpinBox, QPushButton,
+    QColorDialog, QFontComboBox, QCheckBox,
     QDialogButtonBox
 )
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont
 
 from rsvp.core.settings import get_settings_manager
@@ -51,6 +52,8 @@ class SettingsDialog(QDialog):
         self.setMinimumWidth(450)
         self._setup_ui()
         self._load_settings()
+        # Snapshot for rollback if user clicks Apply then Cancel
+        self._original_settings = asdict(get_settings_manager().settings)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -95,12 +98,6 @@ class SettingsDialog(QDialog):
         behavior_group = QGroupBox("Behavior")
         behavior_layout = QFormLayout()
 
-        self.pause_paragraphs_check = QCheckBox()
-        behavior_layout.addRow("Pause at paragraphs:", self.pause_paragraphs_check)
-
-        self.auto_save_check = QCheckBox()
-        behavior_layout.addRow("Auto-save position:", self.auto_save_check)
-
         self.always_on_top_check = QCheckBox()
         behavior_layout.addRow("Always on top:", self.always_on_top_check)
 
@@ -128,8 +125,6 @@ class SettingsDialog(QDialog):
         self.orp_color_btn.set_color(settings.orp_color)
         self.bg_color_btn.set_color(settings.background_color)
         self.default_wpm_spin.setValue(settings.wpm)
-        self.pause_paragraphs_check.setChecked(settings.pause_at_paragraphs)
-        self.auto_save_check.setChecked(settings.auto_save_position)
         self.always_on_top_check.setChecked(settings.always_on_top)
 
     def _apply(self):
@@ -143,8 +138,6 @@ class SettingsDialog(QDialog):
         settings.orp_color = self.orp_color_btn.get_color()
         settings.background_color = self.bg_color_btn.get_color()
         settings.wpm = self.default_wpm_spin.value()
-        settings.pause_at_paragraphs = self.pause_paragraphs_check.isChecked()
-        settings.auto_save_position = self.auto_save_check.isChecked()
         settings.always_on_top = self.always_on_top_check.isChecked()
 
         manager.save()
@@ -153,3 +146,12 @@ class SettingsDialog(QDialog):
         """Save settings and close."""
         self._apply()
         self.accept()
+
+    def reject(self):
+        """Restore original settings on cancel (undoes any Apply clicks)."""
+        manager = get_settings_manager()
+        for key, value in self._original_settings.items():
+            if hasattr(manager.settings, key):
+                setattr(manager.settings, key, value)
+        manager.save()
+        super().reject()

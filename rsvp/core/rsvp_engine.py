@@ -1,6 +1,6 @@
 """RSVP playback engine."""
 from dataclasses import dataclass, field
-from typing import Optional, Callable
+from typing import Optional
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from rsvp.core.text_processor import Word, process_text
@@ -26,7 +26,9 @@ class RSVPState:
         """Get progress as a percentage (0-100)."""
         if not self.words:
             return 0.0
-        return (self.current_index / len(self.words)) * 100
+        if len(self.words) == 1:
+            return 100.0
+        return (self.current_index / (len(self.words) - 1)) * 100
 
     @property
     def words_remaining(self) -> int:
@@ -38,7 +40,8 @@ class RSVPState:
         """Estimate time remaining in seconds."""
         if self.wpm <= 0:
             return 0.0
-        return (self.words_remaining / self.wpm) * 60
+        base_interval = 60.0 / self.wpm
+        return sum(base_interval * w.pause_after for w in self.words[self.current_index:])
 
 
 class RSVPEngine(QObject):
@@ -151,7 +154,10 @@ class RSVPEngine(QObject):
         if not self._state.words:
             return
 
-        index = int((percent / 100) * len(self._state.words))
+        if len(self._state.words) == 1:
+            index = 0
+        else:
+            index = round((percent / 100) * (len(self._state.words) - 1))
         self.seek(index)
 
     def skip_forward(self, words: int = 10):
@@ -169,6 +175,11 @@ class RSVPEngine(QObject):
 
         # Start from one word before current
         idx = max(0, self._state.current_index - 1)
+
+        # Skip past any contiguous sentence-ending words at the start position.
+        # This prevents getting stuck when already at a sentence boundary.
+        while idx > 0 and self._state.words[idx].text and self._state.words[idx].text[-1] in '.!?':
+            idx -= 1
 
         # Find the previous sentence-ending punctuation
         while idx > 0:
@@ -220,8 +231,9 @@ class RSVPEngine(QObject):
 
         if self._state.current_index >= len(self._state.words):
             # Reached the end
-            self.pause()
             self._state.current_index = len(self._state.words) - 1
+            self.pause()
+            self.progress_changed.emit(self._state.progress)
             self.finished.emit()
             return
 

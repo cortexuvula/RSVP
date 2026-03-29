@@ -1,10 +1,9 @@
 """Main application window."""
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QMenuBar, QMenu, QToolBar, QStatusBar, QFileDialog,
-    QMessageBox, QLabel
+    QStatusBar, QFileDialog, QMessageBox, QLabel
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QKeySequence, QShortcut
 
 from rsvp.core.rsvp_engine import RSVPEngine
@@ -175,6 +174,13 @@ class MainWindow(QMainWindow):
         add_bookmark_action.triggered.connect(self._add_bookmark)
         bookmarks_menu.addAction(add_bookmark_action)
 
+        remove_bookmark_action = QAction("&Remove Bookmark", self)
+        remove_bookmark_action.setShortcut("Ctrl+Shift+B")
+        remove_bookmark_action.triggered.connect(self._remove_bookmark)
+        bookmarks_menu.addAction(remove_bookmark_action)
+
+        bookmarks_menu.addSeparator()
+
         self.bookmarks_submenu = bookmarks_menu.addMenu("Go to Bookmark")
 
         # Help menu
@@ -260,7 +266,9 @@ class MainWindow(QMainWindow):
             self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         else:
             self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
-        self.show()
+        # setWindowFlag hides the widget; re-show only if already visible
+        if self.isVisible():
+            self.show()
 
     def _update_recent_menu(self):
         """Update the recent files menu."""
@@ -368,13 +376,11 @@ class MainWindow(QMainWindow):
     def _speed_up(self):
         """Increase WPM."""
         new_wpm = min(2000, self._engine.wpm + 25)
-        self._engine.wpm = new_wpm
         self.speed_control.set_wpm(new_wpm)
 
     def _speed_down(self):
         """Decrease WPM."""
         new_wpm = max(50, self._engine.wpm - 25)
-        self._engine.wpm = new_wpm
         self.speed_control.set_wpm(new_wpm)
 
     def _add_bookmark(self):
@@ -392,6 +398,24 @@ class MainWindow(QMainWindow):
         )
         self._update_bookmarks_menu()
         self.status_label.setText(f"Bookmark added at word {self._engine.current_index}")
+
+    def _remove_bookmark(self):
+        """Remove the bookmark at or nearest to the current position."""
+        if not self._current_file:
+            return
+
+        bookmarks = get_settings_manager().get_bookmarks(self._current_file)
+        if not bookmarks:
+            self.status_label.setText("No bookmarks to remove")
+            return
+
+        current = self._engine.current_index
+        if current in bookmarks:
+            get_settings_manager().remove_bookmark(self._current_file, current)
+            self._update_bookmarks_menu()
+            self.status_label.setText(f"Bookmark removed at word {current}")
+        else:
+            self.status_label.setText("No bookmark at current position")
 
     def _update_bookmarks_menu(self):
         """Update the bookmarks submenu."""
@@ -411,8 +435,13 @@ class MainWindow(QMainWindow):
             self.bookmarks_submenu.addAction(no_bookmarks)
             return
 
+        words = self._engine.state.words
         for idx in bookmarks:
-            action = QAction(f"Word {idx}", self)
+            if idx < len(words):
+                label = f"Word {idx}: \"{words[idx].text}\""
+            else:
+                label = f"Word {idx}"
+            action = QAction(label, self)
             action.triggered.connect(lambda checked, i=idx: self._engine.seek(i))
             self.bookmarks_submenu.addAction(action)
 
@@ -443,7 +472,7 @@ class MainWindow(QMainWindow):
             self,
             "About RSVP Reader",
             "<h2>RSVP Reader</h2>"
-            "<p>Version 1.0.0</p>"
+            "<p>Version 1.1.0</p>"
             "<p>A Rapid Serial Visual Presentation speed reading application.</p>"
             "<p>RSVP displays text one word at a time with the Optimal Recognition "
             "Point (ORP) highlighted, allowing for faster reading speeds.</p>"
@@ -457,10 +486,11 @@ class MainWindow(QMainWindow):
         """Handle state changed signal."""
         self.playback_controls.set_playing(self._engine.is_playing)
 
-    def _on_progress_changed(self, progress):
+    def _on_progress_changed(self, progress: float):
         """Handle progress changed signal."""
         state = self._engine.state
         self.progress_widget.update_progress(
+            progress,
             state.current_index,
             len(state.words),
             state.time_remaining_seconds

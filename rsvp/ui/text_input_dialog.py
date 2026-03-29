@@ -18,6 +18,7 @@ class TextInputDialog(QDialog):
         self.setMinimumSize(600, 400)
         self._text = ""
         self._source_path = None
+        self._url_text_truncated = False
         self._setup_ui()
 
     def _setup_ui(self):
@@ -147,12 +148,17 @@ class TextInputDialog(QDialog):
         if not url:
             return
 
+        from PyQt6.QtWidgets import QApplication
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             text = fetch_text_from_url(url)
-            self.url_preview.setPlainText(text[:5000] + ("..." if len(text) > 5000 else ""))
+            self._url_text_truncated = len(text) > 5000
+            self.url_preview.setPlainText(text[:5000] + ("..." if self._url_text_truncated else ""))
             self._source_path = url
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to fetch URL: {e}")
+        finally:
+            QApplication.restoreOverrideCursor()
 
     def _accept(self):
         """Accept the dialog and set the text."""
@@ -171,16 +177,15 @@ class TextInputDialog(QDialog):
             else:
                 self._text = ""
         else:  # URL
-            text = self.url_preview.toPlainText()
-            if text.endswith("..."):
-                # Fetch full text
+            if self._url_text_truncated:
+                # Preview was truncated, fetch full text
                 try:
                     self._text = fetch_text_from_url(self.url_edit.text().strip())
                 except Exception as e:
                     QMessageBox.warning(self, "Error", f"Failed to fetch URL: {e}")
                     return
             else:
-                self._text = text
+                self._text = self.url_preview.toPlainText()
 
         if self._text.strip():
             self.accept()
