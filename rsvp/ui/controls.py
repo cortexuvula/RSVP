@@ -117,6 +117,7 @@ class SpeedControl(QWidget):
         # Decrease button
         self.decrease_btn = QPushButton("-")
         self.decrease_btn.setFixedSize(30, 30)
+        self.decrease_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.decrease_btn.clicked.connect(self._decrease_wpm)
         layout.addWidget(self.decrease_btn)
 
@@ -127,6 +128,7 @@ class SpeedControl(QWidget):
         self.slider.setValue(300)
         self.slider.setTickInterval(50)
         self.slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.slider.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         self.slider.valueChanged.connect(self._on_slider_change)
         layout.addWidget(self.slider)
 
@@ -137,14 +139,18 @@ class SpeedControl(QWidget):
         self.spinbox.setValue(300)
         self.spinbox.setSingleStep(25)
         self.spinbox.setSuffix(" wpm")
+        self.spinbox.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         self.spinbox.valueChanged.connect(self._on_spinbox_change)
         layout.addWidget(self.spinbox)
 
         # Increase button
         self.increase_btn = QPushButton("+")
         self.increase_btn.setFixedSize(30, 30)
+        self.increase_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.increase_btn.clicked.connect(self._increase_wpm)
         layout.addWidget(self.increase_btn)
+
+        self.slider.setStyleSheet("QSlider:focus { border: 1px solid #4A9EFF; }")
 
     def _decrease_wpm(self):
         new_val = max(50, self.spinbox.value() - 25)

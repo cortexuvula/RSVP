@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QStatusBar, QFileDialog, QMessageBox, QLabel
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtGui import QAction, QKeySequence, QShortcut
 
 from rsvp.core.rsvp_engine import RSVPEngine
@@ -27,6 +27,8 @@ class MainWindow(QMainWindow):
         self._setup_shortcuts()
         self._connect_signals()
         self._load_window_settings()
+        self.installEventFilter(self)
+        self._setup_tab_order()
         self._check_settings_reset()
 
     def _setup_ui(self):
@@ -157,13 +159,11 @@ class MainWindow(QMainWindow):
 
         playback_menu.addSeparator()
 
-        speed_up_action = QAction("Speed &Up", self)
-        speed_up_action.setShortcut("Up")
+        speed_up_action = QAction("Speed &Up (+/Up)", self)
         speed_up_action.triggered.connect(self._speed_up)
         playback_menu.addAction(speed_up_action)
 
-        speed_down_action = QAction("Speed &Down", self)
-        speed_down_action.setShortcut("Down")
+        speed_down_action = QAction("Speed &Down (-/Down)", self)
         speed_down_action.triggered.connect(self._speed_down)
         playback_menu.addAction(speed_down_action)
 
@@ -200,16 +200,10 @@ class MainWindow(QMainWindow):
 
     def _setup_shortcuts(self):
         """Set up keyboard shortcuts."""
-        # Navigation shortcuts
-        QShortcut(QKeySequence("Left"), self, self._engine.skip_backward)
-        QShortcut(QKeySequence("Right"), self, self._engine.skip_forward)
         QShortcut(QKeySequence("Shift+Left"), self, self._engine.previous_sentence)
         QShortcut(QKeySequence("Shift+Right"), self, self._engine.next_sentence)
         QShortcut(QKeySequence("Home"), self, lambda: self._engine.seek(0))
         QShortcut(QKeySequence("End"), self, lambda: self._engine.seek(self._engine.word_count - 1))
-
-        # Escape to stop
-        QShortcut(QKeySequence("Escape"), self, self._engine.pause)
 
     def _connect_signals(self):
         """Connect signals between components."""
@@ -230,6 +224,34 @@ class MainWindow(QMainWindow):
 
         self.speed_control.wpm_changed.connect(self._on_wpm_changed)
         self.progress_widget.seek_requested.connect(self._engine.seek_percent)
+
+    def eventFilter(self, obj, event):
+        """Handle focus-aware keyboard navigation."""
+        if event.type() == QEvent.Type.KeyPress:
+            key = event.key()
+            if key in (Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right):
+                focus = self.focusWidget()
+                if focus in (self.speed_control.slider, self.speed_control.spinbox):
+                    return False
+                if key == Qt.Key.Key_Up:
+                    self._speed_up()
+                elif key == Qt.Key.Key_Down:
+                    self._speed_down()
+                elif key == Qt.Key.Key_Left:
+                    self._engine.skip_backward()
+                elif key == Qt.Key.Key_Right:
+                    self._engine.skip_forward()
+                return True
+            if key == Qt.Key.Key_Escape:
+                self._engine.pause()
+                self.word_display.setFocus()
+                return True
+        return super().eventFilter(obj, event)
+
+    def _setup_tab_order(self):
+        """Set up Tab key navigation order."""
+        self.setTabOrder(self.speed_control.slider, self.speed_control.spinbox)
+        self.setTabOrder(self.speed_control.spinbox, self.word_display)
 
     def _maybe_save_position(self):
         """Save current reading position if auto-save is enabled."""
@@ -496,7 +518,8 @@ class MainWindow(QMainWindow):
 <tr><td><b>Ctrl+B</b></td><td>Add bookmark</td></tr>
 <tr><td><b>Ctrl+,</b></td><td>Settings</td></tr>
 <tr><td><b>F11</b></td><td>Fullscreen</td></tr>
-<tr><td><b>Escape</b></td><td>Pause</td></tr>
+<tr><td><b>Tab</b></td><td>Cycle focus (speed controls)</td></tr>
+<tr><td><b>Escape</b></td><td>Pause and return focus to display</td></tr>
 </table>
 """
         QMessageBox.information(self, "Keyboard Shortcuts", shortcuts)
