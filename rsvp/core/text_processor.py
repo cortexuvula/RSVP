@@ -1,6 +1,7 @@
 """Text processing utilities for RSVP."""
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 
@@ -161,9 +162,32 @@ def extract_text_from_html(html: str) -> str:
 
 
 def load_text_from_file(filepath: str) -> str:
-    """Load text from a file."""
-    with open(filepath, 'r', encoding='utf-8') as f:
-        return f.read()
+    """Load text from a file, dispatching by extension."""
+    ext = Path(filepath).suffix.lower()
+
+    if ext == '.md':
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return strip_markdown(f.read())
+    elif ext in ('.html', '.htm'):
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return extract_text_from_html(f.read())
+    elif ext == '.epub':
+        return load_text_from_epub(filepath)
+    elif ext == '.pdf':
+        return load_text_from_pdf(filepath)
+    else:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return f.read()
+
+
+def load_text_from_epub(filepath: str) -> str:
+    """Load text from an EPUB file."""
+    raise ValueError("EPUB support requires 'ebooklib'. Install with: pip install ebooklib")
+
+
+def load_text_from_pdf(filepath: str) -> str:
+    """Load text from a PDF file."""
+    raise ValueError("PDF support requires 'pymupdf'. Install with: pip install pymupdf")
 
 
 def fetch_text_from_url(url: str) -> str:

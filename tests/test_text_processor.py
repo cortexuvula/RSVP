@@ -376,3 +376,47 @@ class TestStripMarkdown:
 
     def test_empty_string(self):
         assert strip_markdown("") == ""
+
+
+class TestFileFormatDispatch:
+    """Tests for load_text_from_file format routing."""
+
+    def test_loads_txt(self, tmp_path):
+        f = tmp_path / "test.txt"
+        f.write_text("Plain text content", encoding="utf-8")
+        result = load_text_from_file(str(f))
+        assert result == "Plain text content"
+
+    def test_loads_markdown(self, tmp_path):
+        f = tmp_path / "test.md"
+        f.write_text("# Title\n\nSome **bold** text.", encoding="utf-8")
+        result = load_text_from_file(str(f))
+        assert "Title" in result
+        assert "**" not in result
+        assert "#" not in result
+
+    def test_loads_html(self, tmp_path):
+        f = tmp_path / "test.html"
+        f.write_text("<html><body><p>Hello world</p></body></html>", encoding="utf-8")
+        result = load_text_from_file(str(f))
+        assert "Hello world" in result
+        assert "<p>" not in result
+
+    def test_loads_htm(self, tmp_path):
+        f = tmp_path / "test.htm"
+        f.write_text("<p>HTM content</p>", encoding="utf-8")
+        result = load_text_from_file(str(f))
+        assert "HTM content" in result
+
+    def test_unknown_extension_reads_as_text(self, tmp_path):
+        f = tmp_path / "test.xyz"
+        f.write_text("raw content", encoding="utf-8")
+        result = load_text_from_file(str(f))
+        assert result == "raw content"
+
+    def test_case_insensitive_extension(self, tmp_path):
+        f = tmp_path / "test.MD"
+        f.write_text("# Header\n\nContent", encoding="utf-8")
+        result = load_text_from_file(str(f))
+        assert "Header" in result
+        assert "#" not in result
