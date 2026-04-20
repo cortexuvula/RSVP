@@ -4,6 +4,7 @@ from typing import Optional
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from rsvp.core.text_processor import Word, process_text
+from rsvp.core.settings import get_settings_manager
 
 
 @dataclass
@@ -214,12 +215,13 @@ class RSVPEngine(QObject):
 
     def _update_timer_interval(self):
         """Update timer interval based on WPM and current word."""
-        base_interval = 60000 / self._state.wpm  # Base ms per word
+        base_interval = 60000 / self._state.wpm
 
-        # Apply pause multiplier for current word
         current = self._state.current_word
         if current:
             interval = base_interval * current.pause_after
+            if current.paragraph_break_after and get_settings_manager().settings.pause_at_paragraphs:
+                interval *= 3.0
         else:
             interval = base_interval
 

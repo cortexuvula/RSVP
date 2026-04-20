@@ -101,6 +101,12 @@ class SettingsDialog(QDialog):
         self.always_on_top_check = QCheckBox()
         behavior_layout.addRow("Always on top:", self.always_on_top_check)
 
+        self.pause_paragraphs_check = QCheckBox()
+        behavior_layout.addRow("Pause at paragraph breaks:", self.pause_paragraphs_check)
+
+        self.auto_save_check = QCheckBox()
+        behavior_layout.addRow("Remember reading position:", self.auto_save_check)
+
         behavior_group.setLayout(behavior_layout)
         layout.addWidget(behavior_group)
 
@@ -126,6 +132,8 @@ class SettingsDialog(QDialog):
         self.bg_color_btn.set_color(settings.background_color)
         self.default_wpm_spin.setValue(settings.wpm)
         self.always_on_top_check.setChecked(settings.always_on_top)
+        self.pause_paragraphs_check.setChecked(settings.pause_at_paragraphs)
+        self.auto_save_check.setChecked(settings.auto_save_position)
 
     def _apply(self):
         """Apply settings without closing."""
@@ -139,6 +147,8 @@ class SettingsDialog(QDialog):
         settings.background_color = self.bg_color_btn.get_color()
         settings.wpm = self.default_wpm_spin.value()
         settings.always_on_top = self.always_on_top_check.isChecked()
+        settings.pause_at_paragraphs = self.pause_paragraphs_check.isChecked()
+        settings.auto_save_position = self.auto_save_check.isChecked()
 
         manager.save()
 

@@ -592,3 +592,37 @@ class TestRSVPEngineSentenceNavigation:
         engine.next_sentence()  # should not crash
         engine.previous_sentence()  # should not crash
         assert engine.current_index == 0
+
+
+class TestRSVPEngineParagraphPause:
+    """Tests for paragraph pause in timer interval."""
+
+    def test_paragraph_break_multiplies_interval(self, qapp):
+        engine = RSVPEngine()
+        engine.load_text("End.\n\nStart")
+        assert engine.state.words[0].paragraph_break_after is True
+        engine._state.wpm = 300
+        engine._update_timer_interval()
+        # 200ms * 2.5 (period) * 3.0 (paragraph) = 1500ms
+        assert engine._timer.interval() == 1500
+
+    def test_no_paragraph_break_no_extra_pause(self, qapp):
+        engine = RSVPEngine()
+        engine.load_text("Hello world")
+        engine._state.wpm = 300
+        engine._update_timer_interval()
+        assert engine._timer.interval() == 200
+
+    def test_paragraph_pause_disabled_in_settings(self, qapp):
+        from rsvp.core.settings import get_settings_manager
+        manager = get_settings_manager()
+        original = manager.settings.pause_at_paragraphs
+        try:
+            manager.settings.pause_at_paragraphs = False
+            engine = RSVPEngine()
+            engine.load_text("End.\n\nStart")
+            engine._state.wpm = 300
+            engine._update_timer_interval()
+            assert engine._timer.interval() == 500
+        finally:
+            manager.settings.pause_at_paragraphs = original
