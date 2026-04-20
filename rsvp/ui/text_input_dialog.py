@@ -128,9 +128,15 @@ class TextInputDialog(QDialog):
         """Open file browser."""
         filepath, _ = QFileDialog.getOpenFileName(
             self,
-            "Open Text File",
+            "Open File",
             "",
-            "Text Files (*.txt);;All Files (*)"
+            "All Supported (*.txt *.md *.html *.htm *.epub *.pdf);;"
+            "Text (*.txt);;"
+            "Markdown (*.md);;"
+            "HTML (*.html *.htm);;"
+            "EPUB (*.epub);;"
+            "PDF (*.pdf);;"
+            "All Files (*)"
         )
 
         if filepath:
