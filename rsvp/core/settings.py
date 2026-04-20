@@ -34,6 +34,9 @@ class RSVPSettings:
     # Bookmarks: dict mapping filepath to list of word indices
     bookmarks: dict[str, list[int]] = field(default_factory=dict)
 
+    # Saved reading positions: maps source path/URL to word index
+    saved_positions: dict[str, int] = field(default_factory=dict)
+
 
 class SettingsManager:
     """Manager for loading and saving settings."""
@@ -142,6 +145,20 @@ class SettingsManager:
     def get_bookmarks(self, filepath: str) -> list[int]:
         """Get bookmarks for a file."""
         return self._settings.bookmarks.get(filepath, [])
+
+    def save_position(self, source: str, index: int):
+        """Save reading position for a source."""
+        self._settings.saved_positions[source] = index
+        self.save()
+
+    def get_position(self, source: str) -> int | None:
+        """Get saved reading position for a source."""
+        return self._settings.saved_positions.get(source)
+
+    def clear_position(self, source: str):
+        """Clear saved reading position for a source."""
+        self._settings.saved_positions.pop(source, None)
+        self.save()
 
 
 # Global settings instance

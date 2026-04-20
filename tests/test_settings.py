@@ -209,3 +209,51 @@ class TestSettingsErrorRecovery:
         manager._config_path.write_text("not json{{{")
         manager.load()
         assert manager.settings.wpm == 300
+
+
+class TestSettingsPositionTracking:
+    """Tests for save/get/clear position methods."""
+
+    @pytest.fixture
+    def manager(self, tmp_path):
+        mgr = SettingsManager.__new__(SettingsManager)
+        mgr._settings = RSVPSettings()
+        mgr._settings_were_reset = False
+        mgr._config_path = tmp_path / "settings.json"
+        return mgr
+
+    def test_save_and_get_position(self, manager):
+        manager.save_position("/file.txt", 42)
+        assert manager.get_position("/file.txt") == 42
+
+    def test_get_position_unknown_source(self, manager):
+        assert manager.get_position("/nonexistent.txt") is None
+
+    def test_save_position_overwrites(self, manager):
+        manager.save_position("/file.txt", 10)
+        manager.save_position("/file.txt", 50)
+        assert manager.get_position("/file.txt") == 50
+
+    def test_clear_position(self, manager):
+        manager.save_position("/file.txt", 42)
+        manager.clear_position("/file.txt")
+        assert manager.get_position("/file.txt") is None
+
+    def test_clear_position_nonexistent(self, manager):
+        manager.clear_position("/nonexistent.txt")  # should not crash
+
+    def test_save_position_persists(self, manager):
+        manager.save_position("/file.txt", 42)
+        assert manager._config_path.exists()
+        data = json.loads(manager._config_path.read_text())
+        assert data["saved_positions"] == {"/file.txt": 42}
+
+    def test_multiple_sources(self, manager):
+        manager.save_position("/a.txt", 10)
+        manager.save_position("/b.txt", 20)
+        assert manager.get_position("/a.txt") == 10
+        assert manager.get_position("/b.txt") == 20
+
+    def test_default_saved_positions_empty(self):
+        s = RSVPSettings()
+        assert s.saved_positions == {}
