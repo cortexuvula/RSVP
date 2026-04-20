@@ -27,6 +27,7 @@ class MainWindow(QMainWindow):
         self._setup_shortcuts()
         self._connect_signals()
         self._load_window_settings()
+        self._check_settings_reset()
 
     def _setup_ui(self):
         """Set up the user interface."""
@@ -230,6 +231,30 @@ class MainWindow(QMainWindow):
         self.speed_control.wpm_changed.connect(self._on_wpm_changed)
         self.progress_widget.seek_requested.connect(self._engine.seek_percent)
 
+    def _maybe_save_position(self):
+        """Save current reading position if auto-save is enabled."""
+        manager = get_settings_manager()
+        if not manager.settings.auto_save_position:
+            return
+        if self._current_file and self._engine.current_index > 0:
+            manager.save_position(self._current_file, self._engine.current_index)
+
+    def _maybe_resume_position(self, source: str):
+        """Offer to resume from saved position if available."""
+        manager = get_settings_manager()
+        if not manager.settings.auto_save_position or not source:
+            return
+        saved_index = manager.get_position(source)
+        if saved_index is not None and saved_index > 0 and saved_index < self._engine.word_count:
+            reply = QMessageBox.question(
+                self,
+                "Resume Reading",
+                f"Resume from word {saved_index} of {self._engine.word_count}?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._engine.seek(saved_index)
+
     def _load_window_settings(self):
         """Load window position and size from settings."""
         settings = get_settings_manager().settings
@@ -287,6 +312,7 @@ class MainWindow(QMainWindow):
 
     def _load_text_dialog(self):
         """Show the text input dialog."""
+        self._maybe_save_position()
         dialog = TextInputDialog(self)
         if dialog.exec():
             text = dialog.get_text()
@@ -304,6 +330,7 @@ class MainWindow(QMainWindow):
 
             self._update_bookmarks_menu()
             self.status_label.setText(f"Loaded {self._engine.word_count} words")
+            self._maybe_resume_position(source)
 
     def _open_file(self):
         """Open a file directly."""
@@ -319,6 +346,7 @@ class MainWindow(QMainWindow):
 
     def _load_file(self, filepath: str):
         """Load a file."""
+        self._maybe_save_position()
         try:
             text = load_text_from_file(filepath)
             self._engine.load_text(text)
@@ -330,6 +358,7 @@ class MainWindow(QMainWindow):
 
             self.setWindowTitle(f"RSVP Reader - {filepath}")
             self.status_label.setText(f"Loaded {self._engine.word_count} words")
+            self._maybe_resume_position(filepath)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to load file: {e}")
 
@@ -503,8 +532,21 @@ class MainWindow(QMainWindow):
     def _on_finished(self):
         """Handle finished signal."""
         self.status_label.setText("Finished reading")
+        if self._current_file:
+            get_settings_manager().clear_position(self._current_file)
+
+    def _check_settings_reset(self):
+        """Show notification if settings were reset due to corruption."""
+        if get_settings_manager().was_reset():
+            QMessageBox.warning(
+                self,
+                "Settings Reset",
+                "Your settings file was corrupted and has been reset to defaults. "
+                "A backup was saved to settings.json.bak.",
+            )
 
     def closeEvent(self, event):
         """Handle window close."""
+        self._maybe_save_position()
         self._save_window_settings()
         event.accept()
