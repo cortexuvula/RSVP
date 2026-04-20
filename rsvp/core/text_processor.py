@@ -144,21 +144,26 @@ def process_text(text: str) -> list[Word]:
 
 def extract_text_from_html(html: str) -> str:
     """Extract readable text from HTML content."""
-    from bs4 import BeautifulSoup
+    from bs4 import BeautifulSoup, NavigableString
 
     soup = BeautifulSoup(html, 'html.parser')
 
-    # Remove script and style elements
     for element in soup(['script', 'style', 'nav', 'header', 'footer', 'aside']):
         element.decompose()
 
-    # Get text
-    text = soup.get_text(separator=' ')
+    BLOCK_TAGS = {
+        'p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'li', 'blockquote', 'pre', 'tr', 'br', 'hr',
+        'section', 'article', 'main',
+    }
+    for tag in soup.find_all(BLOCK_TAGS):
+        tag.insert_before('\n\n')
 
-    # Clean up whitespace
-    text = re.sub(r'\s+', ' ', text).strip()
-
-    return text
+    text = soup.get_text()
+    text = re.sub(r'[^\S\n]+', ' ', text)
+    text = re.sub(r'\n\s*\n', '\n\n', text)
+    text = re.sub(r' *\n', '\n', text)
+    return text.strip()
 
 
 def load_text_from_file(filepath: str) -> str:
@@ -212,15 +217,12 @@ def load_text_from_pdf(filepath: str) -> str:
     except ImportError:
         raise ValueError("PDF support requires 'pymupdf'. Install with: pip install pymupdf")
 
-    doc = fitz.open(filepath)
-    pages = []
-
-    for page in doc:
-        text = page.get_text()
-        if text.strip():
-            pages.append(text.strip())
-
-    doc.close()
+    with fitz.open(filepath) as doc:
+        pages = []
+        for page in doc:
+            text = page.get_text()
+            if text.strip():
+                pages.append(text.strip())
 
     if not pages:
         raise ValueError("No readable text found in PDF file")

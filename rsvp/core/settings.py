@@ -83,7 +83,6 @@ class SettingsManager:
                         if hasattr(self._settings, key):
                             setattr(self._settings, key, value)
             except (json.JSONDecodeError, IOError):
-                # Use defaults if config is corrupted
                 import shutil
                 import sys
                 backup_path = self._config_path.with_suffix('.json.bak')
@@ -95,6 +94,7 @@ class SettingsManager:
                     f"Settings file corrupted, reset to defaults. Backup: {backup_path}",
                     file=sys.stderr,
                 )
+                self._settings = RSVPSettings()
                 self._settings_were_reset = True
 
     def was_reset(self) -> bool:
