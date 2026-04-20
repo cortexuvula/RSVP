@@ -10,6 +10,7 @@ class Word:
     text: str
     orp_index: int  # Index of the optimal recognition point character
     pause_after: float  # Multiplier for pause duration after this word
+    paragraph_break_after: bool = False
 
     @property
     def before_orp(self) -> str:
@@ -82,21 +83,34 @@ def process_text(text: str) -> list[Word]:
     Process text into a list of Word objects.
 
     Splits text on whitespace and calculates ORP and pause for each word.
+    Detects paragraph boundaries (double newlines) and marks the last word
+    of each paragraph (except the final one) with paragraph_break_after=True.
     """
-    # Normalize whitespace
-    text = re.sub(r'\s+', ' ', text.strip())
-
-    if not text:
+    if not text or not text.strip():
         return []
 
-    words = []
-    for raw_word in text.split():
-        if raw_word:
-            orp = calculate_orp(raw_word)
-            pause = calculate_pause_multiplier(raw_word)
-            words.append(Word(text=raw_word, orp_index=orp, pause_after=pause))
+    paragraphs = re.split(r'\n\s*\n', text)
 
-    return words
+    all_words: list[Word] = []
+    paragraph_end_indices: list[int] = []
+
+    for para in paragraphs:
+        normalized = re.sub(r'\s+', ' ', para.strip())
+        if not normalized:
+            continue
+        para_start = len(all_words)
+        for raw_word in normalized.split():
+            if raw_word:
+                orp = calculate_orp(raw_word)
+                pause = calculate_pause_multiplier(raw_word)
+                all_words.append(Word(text=raw_word, orp_index=orp, pause_after=pause))
+        if len(all_words) > para_start:
+            paragraph_end_indices.append(len(all_words) - 1)
+
+    for idx in paragraph_end_indices[:-1]:
+        all_words[idx].paragraph_break_after = True
+
+    return all_words
 
 
 def extract_text_from_html(html: str) -> str:

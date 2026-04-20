@@ -256,3 +256,58 @@ class TestLoadTextFromFile:
     def test_load_nonexistent_file(self):
         with pytest.raises(FileNotFoundError):
             load_text_from_file("/nonexistent/path/file.txt")
+
+
+class TestParagraphBreakDetection:
+    """Tests for paragraph break detection in process_text."""
+
+    def test_no_paragraph_breaks(self):
+        words = process_text("Hello world")
+        assert all(w.paragraph_break_after is False for w in words)
+
+    def test_single_paragraph_break(self):
+        words = process_text("First paragraph.\n\nSecond paragraph.")
+        assert words[1].paragraph_break_after is True
+        assert words[1].text == "paragraph."
+        assert words[0].paragraph_break_after is False
+        assert words[2].paragraph_break_after is False
+        assert words[3].paragraph_break_after is False
+
+    def test_multiple_paragraph_breaks(self):
+        words = process_text("One.\n\nTwo.\n\nThree.")
+        assert words[0].paragraph_break_after is True   # "One."
+        assert words[1].paragraph_break_after is True   # "Two."
+        assert words[2].paragraph_break_after is False   # "Three." (last paragraph)
+
+    def test_last_paragraph_not_marked(self):
+        words = process_text("First para.\n\nSecond para.")
+        last_word = words[-1]
+        assert last_word.paragraph_break_after is False
+
+    def test_extra_blank_lines(self):
+        words = process_text("One.\n\n\n\nTwo.")
+        assert words[0].paragraph_break_after is True
+
+    def test_blank_line_with_spaces(self):
+        words = process_text("One.\n   \nTwo.")
+        assert words[0].paragraph_break_after is True
+
+    def test_preserves_existing_word_properties(self):
+        words = process_text("Hello.\n\nWorld!")
+        assert words[0].text == "Hello."
+        assert words[0].pause_after == 2.5
+        assert words[0].orp_index == 2  # "Hello." is 6 chars -> orp index 2
+        assert words[1].text == "World!"
+        assert words[1].pause_after == 2.5
+
+    def test_empty_paragraph_skipped(self):
+        words = process_text("\n\nHello\n\n")
+        assert len(words) == 1
+        assert words[0].text == "Hello"
+        assert words[0].paragraph_break_after is False
+
+    def test_single_word_paragraph(self):
+        words = process_text("One.\n\nTwo.\n\nThree.")
+        assert len(words) == 3
+        assert words[0].text == "One."
+        assert words[0].paragraph_break_after is True
