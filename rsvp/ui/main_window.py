@@ -530,7 +530,7 @@ class MainWindow(QMainWindow):
             self,
             "About RSVP Reader",
             "<h2>RSVP Reader</h2>"
-            "<p>Version 1.1.0</p>"
+            "<p>Version 1.2.0</p>"
             "<p>A Rapid Serial Visual Presentation speed reading application.</p>"
             "<p>RSVP displays text one word at a time with the Optimal Recognition "
             "Point (ORP) highlighted, allowing for faster reading speeds.</p>"
