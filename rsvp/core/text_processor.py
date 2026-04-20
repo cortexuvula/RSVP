@@ -78,6 +78,34 @@ def calculate_pause_multiplier(word: str) -> float:
     return 1.0
 
 
+def strip_markdown(text: str) -> str:
+    """Strip Markdown syntax, keeping readable text."""
+    # Code blocks (fenced)
+    text = re.sub(r'```[\s\S]*?```', '', text)
+    # Inline code
+    text = re.sub(r'`([^`]+)`', r'\1', text)
+    # Images (keep alt text)
+    text = re.sub(r'!\[([^\]]*)\]\([^)]+\)', r'\1', text)
+    # Links (keep link text)
+    text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+    # Headers
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+    # Bold + italic combined
+    text = re.sub(r'\*{3}([^*]+)\*{3}', r'\1', text)
+    text = re.sub(r'_{3}([^_]+)_{3}', r'\1', text)
+    # Bold
+    text = re.sub(r'\*{2}([^*]+)\*{2}', r'\1', text)
+    text = re.sub(r'_{2}([^_]+)_{2}', r'\1', text)
+    # Italic
+    text = re.sub(r'\*([^*]+)\*', r'\1', text)
+    text = re.sub(r'_([^_\s]+)_', r'\1', text)
+    # Horizontal rules
+    text = re.sub(r'^[\-\*_]{3,}\s*$', '', text, flags=re.MULTILINE)
+    # HTML tags
+    text = re.sub(r'<[^>]+>', '', text)
+    return text
+
+
 def process_text(text: str) -> list[Word]:
     """
     Process text into a list of Word objects.

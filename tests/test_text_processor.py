@@ -7,6 +7,7 @@ from rsvp.core.text_processor import (
     process_text,
     extract_text_from_html,
     load_text_from_file,
+    strip_markdown,
 )
 
 
@@ -311,3 +312,67 @@ class TestParagraphBreakDetection:
         assert len(words) == 3
         assert words[0].text == "One."
         assert words[0].paragraph_break_after is True
+
+
+class TestStripMarkdown:
+    """Tests for Markdown syntax stripping."""
+
+    def test_strips_h1(self):
+        assert strip_markdown("# Hello World").strip() == "Hello World"
+
+    def test_strips_h3(self):
+        assert strip_markdown("### Section Title").strip() == "Section Title"
+
+    def test_strips_bold(self):
+        assert "important" in strip_markdown("This is **important** text")
+        assert "**" not in strip_markdown("This is **important** text")
+
+    def test_strips_italic(self):
+        assert "emphasis" in strip_markdown("This is *emphasis* here")
+        assert strip_markdown("This is *emphasis* here").count("*") == 0
+
+    def test_strips_underscore_bold(self):
+        result = strip_markdown("This is __bold__ text")
+        assert "bold" in result
+        assert "__" not in result
+
+    def test_strips_links_keeps_text(self):
+        result = strip_markdown("Click [here](https://example.com) please")
+        assert "here" in result
+        assert "https://example.com" not in result
+        assert "[" not in result
+
+    def test_strips_images_keeps_alt(self):
+        result = strip_markdown("An image ![alt text](img.png) follows")
+        assert "alt text" in result
+        assert "img.png" not in result
+
+    def test_strips_inline_code(self):
+        result = strip_markdown("Run `npm install` now")
+        assert "npm install" in result
+        assert "`" not in result
+
+    def test_strips_code_blocks(self):
+        md = "Before\n```python\nprint('hello')\n```\nAfter"
+        result = strip_markdown(md)
+        assert "Before" in result
+        assert "After" in result
+        assert "```" not in result
+
+    def test_strips_horizontal_rules(self):
+        result = strip_markdown("Above\n---\nBelow")
+        assert "Above" in result
+        assert "Below" in result
+        assert "---" not in result
+
+    def test_strips_html_tags(self):
+        result = strip_markdown("Some <em>html</em> content")
+        assert "html" in result
+        assert "<em>" not in result
+
+    def test_preserves_plain_text(self):
+        text = "This is plain text with no markdown."
+        assert strip_markdown(text).strip() == text
+
+    def test_empty_string(self):
+        assert strip_markdown("") == ""
