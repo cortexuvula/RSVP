@@ -1,4 +1,5 @@
 """Tests for text_processor module."""
+import os
 import pytest
 from rsvp.core.text_processor import (
     Word,
@@ -420,3 +421,35 @@ class TestFileFormatDispatch:
         result = load_text_from_file(str(f))
         assert "Header" in result
         assert "#" not in result
+
+
+class TestLoadEpub:
+    """Tests for EPUB file loading."""
+
+    @pytest.fixture
+    def epub_path(self):
+        path = os.path.join(os.path.dirname(__file__), "fixtures", "test.epub")
+        if not os.path.exists(path):
+            pytest.skip("test.epub fixture not found")
+        return path
+
+    def test_loads_epub_text(self, epub_path):
+        result = load_text_from_file(epub_path)
+        assert "Chapter One" in result
+        assert "First chapter content" in result
+
+    def test_epub_has_multiple_chapters(self, epub_path):
+        result = load_text_from_file(epub_path)
+        assert "Chapter One" in result
+        assert "Chapter Two" in result
+        assert "Second chapter content" in result
+
+    def test_epub_strips_html(self, epub_path):
+        result = load_text_from_file(epub_path)
+        assert "<html>" not in result
+        assert "<body>" not in result
+        assert "<h1>" not in result
+
+    def test_epub_chapters_separated(self, epub_path):
+        result = load_text_from_file(epub_path)
+        assert "\n\n" in result

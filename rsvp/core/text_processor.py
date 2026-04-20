@@ -182,7 +182,27 @@ def load_text_from_file(filepath: str) -> str:
 
 def load_text_from_epub(filepath: str) -> str:
     """Load text from an EPUB file."""
-    raise ValueError("EPUB support requires 'ebooklib'. Install with: pip install ebooklib")
+    try:
+        import ebooklib
+        from ebooklib import epub
+    except ImportError:
+        raise ValueError("EPUB support requires 'ebooklib'. Install with: pip install ebooklib")
+
+    book = epub.read_epub(filepath)
+    chapters = []
+
+    for item_id, _ in book.spine:
+        item = book.get_item_with_id(item_id)
+        if item and item.get_type() == ebooklib.ITEM_DOCUMENT:
+            content = item.get_content().decode('utf-8', errors='replace')
+            text = extract_text_from_html(content)
+            if text.strip():
+                chapters.append(text.strip())
+
+    if not chapters:
+        raise ValueError("No readable text found in EPUB file")
+
+    return '\n\n'.join(chapters)
 
 
 def load_text_from_pdf(filepath: str) -> str:
