@@ -40,6 +40,7 @@ class SettingsManager:
 
     def __init__(self):
         self._settings = RSVPSettings()
+        self._settings_were_reset = False
         self._config_path = self._get_config_path()
         self.load()
 
@@ -80,7 +81,24 @@ class SettingsManager:
                             setattr(self._settings, key, value)
             except (json.JSONDecodeError, IOError):
                 # Use defaults if config is corrupted
-                pass
+                import shutil
+                import sys
+                backup_path = self._config_path.with_suffix('.json.bak')
+                try:
+                    shutil.copy2(self._config_path, backup_path)
+                except IOError:
+                    pass
+                print(
+                    f"Settings file corrupted, reset to defaults. Backup: {backup_path}",
+                    file=sys.stderr,
+                )
+                self._settings_were_reset = True
+
+    def was_reset(self) -> bool:
+        """Check if settings were reset due to corruption. Clears the flag after reading."""
+        result = self._settings_were_reset
+        self._settings_were_reset = False
+        return result
 
     def save(self):
         """Save settings to file."""

@@ -1,5 +1,6 @@
 """Tests for settings module."""
 import json
+import sys
 import pytest
 from pathlib import Path
 from rsvp.core.settings import RSVPSettings, SettingsManager
@@ -162,3 +163,49 @@ class TestSettingsManager:
         manager.add_bookmark("/b.txt", 2)
         assert manager.get_bookmarks("/a.txt") == [1]
         assert manager.get_bookmarks("/b.txt") == [2]
+
+
+class TestSettingsErrorRecovery:
+    """Tests for corrupted settings recovery."""
+
+    @pytest.fixture
+    def manager(self, tmp_path):
+        mgr = SettingsManager.__new__(SettingsManager)
+        mgr._settings = RSVPSettings()
+        mgr._settings_were_reset = False
+        mgr._config_path = tmp_path / "settings.json"
+        return mgr
+
+    def test_corrupted_json_creates_backup(self, manager):
+        manager._config_path.write_text("not json{{{")
+        manager.load()
+        backup = manager._config_path.parent / "settings.json.bak"
+        assert backup.exists()
+        assert backup.read_text() == "not json{{{"
+
+    def test_corrupted_json_sets_reset_flag(self, manager):
+        manager._config_path.write_text("not json{{{")
+        manager.load()
+        assert manager.was_reset() is True
+
+    def test_was_reset_clears_after_read(self, manager):
+        manager._config_path.write_text("not json{{{")
+        manager.load()
+        assert manager.was_reset() is True
+        assert manager.was_reset() is False
+
+    def test_was_reset_false_on_clean_load(self, manager):
+        manager._config_path.write_text(json.dumps({"wpm": 400}))
+        manager.load()
+        assert manager.was_reset() is False
+
+    def test_corrupted_json_logs_to_stderr(self, manager, capsys):
+        manager._config_path.write_text("not json{{{")
+        manager.load()
+        captured = capsys.readouterr()
+        assert "corrupted" in captured.err.lower() or "reset" in captured.err.lower()
+
+    def test_corrupted_json_uses_defaults(self, manager):
+        manager._config_path.write_text("not json{{{")
+        manager.load()
+        assert manager.settings.wpm == 300
