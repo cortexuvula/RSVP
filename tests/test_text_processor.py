@@ -453,3 +453,27 @@ class TestLoadEpub:
     def test_epub_chapters_separated(self, epub_path):
         result = load_text_from_file(epub_path)
         assert "\n\n" in result
+
+
+class TestLoadPdf:
+    """Tests for PDF file loading."""
+
+    @pytest.fixture
+    def pdf_path(self):
+        path = os.path.join(os.path.dirname(__file__), "fixtures", "test.pdf")
+        if not os.path.exists(path):
+            pytest.skip("test.pdf fixture not found")
+        return path
+
+    def test_loads_pdf_text(self, pdf_path):
+        result = load_text_from_file(pdf_path)
+        assert "Page one content" in result
+
+    def test_pdf_has_multiple_pages(self, pdf_path):
+        result = load_text_from_file(pdf_path)
+        assert "Page one content" in result
+        assert "Page two content" in result
+
+    def test_pdf_pages_separated(self, pdf_path):
+        result = load_text_from_file(pdf_path)
+        assert "\n\n" in result

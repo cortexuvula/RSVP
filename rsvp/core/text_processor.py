@@ -207,7 +207,25 @@ def load_text_from_epub(filepath: str) -> str:
 
 def load_text_from_pdf(filepath: str) -> str:
     """Load text from a PDF file."""
-    raise ValueError("PDF support requires 'pymupdf'. Install with: pip install pymupdf")
+    try:
+        import fitz
+    except ImportError:
+        raise ValueError("PDF support requires 'pymupdf'. Install with: pip install pymupdf")
+
+    doc = fitz.open(filepath)
+    pages = []
+
+    for page in doc:
+        text = page.get_text()
+        if text.strip():
+            pages.append(text.strip())
+
+    doc.close()
+
+    if not pages:
+        raise ValueError("No readable text found in PDF file")
+
+    return '\n\n'.join(pages)
 
 
 def fetch_text_from_url(url: str) -> str:

@@ -26,6 +26,7 @@ dependencies = [
     "beautifulsoup4>=4.11.0",
     "pyperclip>=1.8.0",
     "ebooklib>=0.18",
+    "pymupdf>=1.23.0",
 ]
 
 [project.optional-dependencies]
