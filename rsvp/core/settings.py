@@ -1,13 +1,20 @@
 """Settings management for RSVP application."""
+
 import json
-from dataclasses import dataclass, asdict, field
+import logging
+import os
+import platform
+import shutil
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class RSVPSettings:
     """Application settings."""
+
     # Display settings
     wpm: int = 300
     font_family: str = "Arial"
@@ -23,8 +30,8 @@ class RSVPSettings:
     # Window settings
     window_width: int = 800
     window_height: int = 600
-    window_x: Optional[int] = None
-    window_y: Optional[int] = None
+    window_x: int | None = None
+    window_y: int | None = None
     always_on_top: bool = False
 
     # Recent files
@@ -44,14 +51,12 @@ class SettingsManager:
     def __init__(self):
         self._settings = RSVPSettings()
         self._settings_were_reset = False
+        self._save_failed = False
         self._config_path = self._get_config_path()
         self.load()
 
     def _get_config_path(self) -> Path:
         """Get the path to the config file."""
-        # Use appropriate config directory for each platform
-        import platform
-
         system = platform.system()
 
         if system == "Windows":
@@ -59,9 +64,7 @@ class SettingsManager:
         elif system == "Darwin":  # macOS
             base = Path.home() / "Library" / "Application Support" / "RSVP"
         else:  # Linux and others
-            xdg_config = Path(
-                __import__('os').environ.get('XDG_CONFIG_HOME', Path.home() / '.config')
-            )
+            xdg_config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
             base = xdg_config / "rsvp"
 
         base.mkdir(parents=True, exist_ok=True)
@@ -76,23 +79,20 @@ class SettingsManager:
         """Load settings from file."""
         if self._config_path.exists():
             try:
-                with open(self._config_path, 'r', encoding='utf-8') as f:
+                with open(self._config_path, encoding="utf-8") as f:
                     data = json.load(f)
-                    # Update settings with loaded values
                     for key, value in data.items():
                         if hasattr(self._settings, key):
                             setattr(self._settings, key, value)
-            except (json.JSONDecodeError, IOError):
-                import shutil
-                import sys
-                backup_path = self._config_path.with_suffix('.json.bak')
+            except (OSError, json.JSONDecodeError):
+                backup_path = self._config_path.with_suffix(".json.bak")
                 try:
                     shutil.copy2(self._config_path, backup_path)
-                except IOError:
-                    pass
-                print(
-                    f"Settings file corrupted, reset to defaults. Backup: {backup_path}",
-                    file=sys.stderr,
+                except OSError as e:
+                    logger.warning("Could not back up corrupted settings file: %s", e)
+                logger.warning(
+                    "Settings file corrupted, reset to defaults. Backup: %s",
+                    backup_path,
                 )
                 self._settings = RSVPSettings()
                 self._settings_were_reset = True
@@ -103,25 +103,29 @@ class SettingsManager:
         self._settings_were_reset = False
         return result
 
+    def save_failed(self) -> bool:
+        """Check if the last save attempt failed. Clears the flag after reading."""
+        result = self._save_failed
+        self._save_failed = False
+        return result
+
     def save(self):
-        """Save settings to file."""
+        """Save settings to file. Logs a warning and sets save_failed flag on IOError."""
         try:
-            with open(self._config_path, 'w', encoding='utf-8') as f:
+            with open(self._config_path, "w", encoding="utf-8") as f:
                 json.dump(asdict(self._settings), f, indent=2)
-        except IOError:
-            pass
+        except OSError as e:
+            self._save_failed = True
+            logger.warning("Failed to save settings to %s: %s", self._config_path, e)
 
     def add_recent_file(self, filepath: str):
         """Add a file to the recent files list."""
-        # Remove if already exists
         if filepath in self._settings.recent_files:
             self._settings.recent_files.remove(filepath)
 
-        # Add to front
         self._settings.recent_files.insert(0, filepath)
 
-        # Trim to max
-        self._settings.recent_files = self._settings.recent_files[:self._settings.max_recent_files]
+        self._settings.recent_files = self._settings.recent_files[: self._settings.max_recent_files]
 
         self.save()
 
@@ -161,8 +165,7 @@ class SettingsManager:
         self.save()
 
 
-# Global settings instance
-_settings_manager: Optional[SettingsManager] = None
+_settings_manager: SettingsManager | None = None
 
 
 def get_settings_manager() -> SettingsManager:

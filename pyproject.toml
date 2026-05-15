@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rsvp-reader"
-version = "1.2.0"
+dynamic = ["version"]
 description = "Rapid Serial Visual Presentation (RSVP) speed reading application"
 readme = "README.md"
 license = {text = "MIT"}
@@ -35,6 +35,7 @@ dev = [
     "pytest-qt>=4.0.0",
     "pytest-cov>=4.0.0",
     "pyinstaller>=5.0.0",
+    "ruff>=0.6.0",
 ]
 
 [project.scripts]
@@ -46,3 +47,30 @@ rsvp-gui = "rsvp.main:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["rsvp*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "rsvp.__version__"}
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+extend-exclude = ["build", "dist", "rsvp_reader.egg-info"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line-too-long: covered by formatter
+    "B008",  # function-call-in-default-argument (false positives with Qt)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]  # asserts inside tests are fine
+"rsvp/core/__init__.py" = ["F401"]  # re-exports
+"rsvp/ui/__init__.py" = ["F401"]

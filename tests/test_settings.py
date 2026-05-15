@@ -1,8 +1,10 @@
 """Tests for settings module."""
+
 import json
-import sys
+from unittest.mock import patch
+
 import pytest
-from pathlib import Path
+
 from rsvp.core.settings import RSVPSettings, SettingsManager
 
 
@@ -199,11 +201,12 @@ class TestSettingsErrorRecovery:
         manager.load()
         assert manager.was_reset() is False
 
-    def test_corrupted_json_logs_to_stderr(self, manager, capsys):
+    def test_corrupted_json_logs_warning(self, manager, caplog):
         manager._config_path.write_text("not json{{{")
-        manager.load()
-        captured = capsys.readouterr()
-        assert "corrupted" in captured.err.lower() or "reset" in captured.err.lower()
+        with caplog.at_level("WARNING", logger="rsvp.core.settings"):
+            manager.load()
+        message = " ".join(r.getMessage() for r in caplog.records).lower()
+        assert "corrupted" in message or "reset" in message
 
     def test_corrupted_json_uses_defaults(self, manager):
         manager._config_path.write_text("not json{{{")
@@ -257,3 +260,38 @@ class TestSettingsPositionTracking:
     def test_default_saved_positions_empty(self):
         s = RSVPSettings()
         assert s.saved_positions == {}
+
+
+class TestSettingsSaveFailure:
+    """Tests for SettingsManager.save() error handling."""
+
+    @pytest.fixture
+    def manager(self, tmp_path):
+        mgr = SettingsManager.__new__(SettingsManager)
+        mgr._settings = RSVPSettings()
+        mgr._settings_were_reset = False
+        mgr._save_failed = False
+        mgr._config_path = tmp_path / "settings.json"
+        return mgr
+
+    def test_save_failure_logs_warning(self, manager, caplog):
+        with patch("builtins.open", side_effect=OSError("disk full")):
+            with caplog.at_level("WARNING", logger="rsvp.core.settings"):
+                manager.save()
+        message = " ".join(r.getMessage() for r in caplog.records).lower()
+        assert "failed to save" in message or "disk full" in message
+
+    def test_save_failure_sets_flag(self, manager):
+        with patch("builtins.open", side_effect=OSError("disk full")):
+            manager.save()
+        assert manager.save_failed() is True
+
+    def test_save_failed_clears_after_read(self, manager):
+        with patch("builtins.open", side_effect=OSError("disk full")):
+            manager.save()
+        assert manager.save_failed() is True
+        assert manager.save_failed() is False
+
+    def test_save_failed_false_on_success(self, manager):
+        manager.save()
+        assert manager.save_failed() is False

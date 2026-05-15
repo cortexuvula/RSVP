@@ -1,9 +1,15 @@
 """Playback control widgets."""
-from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QPushButton,
-    QSlider, QLabel, QSpinBox, QStyle
-)
+
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QSlider, QSpinBox, QStyle, QWidget
+
+from rsvp.core.constants import (
+    WPM_DEFAULT,
+    WPM_MAX,
+    WPM_MIN,
+    WPM_SLIDER_MAX,
+    WPM_STEP,
+)
 
 
 class PlaybackControls(QWidget):
@@ -123,10 +129,10 @@ class SpeedControl(QWidget):
 
         # Slider
         self.slider = QSlider(Qt.Orientation.Horizontal)
-        self.slider.setMinimum(50)
-        self.slider.setMaximum(1000)
-        self.slider.setValue(300)
-        self.slider.setTickInterval(50)
+        self.slider.setMinimum(WPM_MIN)
+        self.slider.setMaximum(WPM_SLIDER_MAX)
+        self.slider.setValue(WPM_DEFAULT)
+        self.slider.setTickInterval(WPM_STEP * 2)
         self.slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.slider.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         self.slider.valueChanged.connect(self._on_slider_change)
@@ -134,10 +140,10 @@ class SpeedControl(QWidget):
 
         # Spinbox
         self.spinbox = QSpinBox()
-        self.spinbox.setMinimum(50)
-        self.spinbox.setMaximum(2000)
-        self.spinbox.setValue(300)
-        self.spinbox.setSingleStep(25)
+        self.spinbox.setMinimum(WPM_MIN)
+        self.spinbox.setMaximum(WPM_MAX)
+        self.spinbox.setValue(WPM_DEFAULT)
+        self.spinbox.setSingleStep(WPM_STEP)
         self.spinbox.setSuffix(" wpm")
         self.spinbox.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         self.spinbox.valueChanged.connect(self._on_spinbox_change)
@@ -153,11 +159,11 @@ class SpeedControl(QWidget):
         self.slider.setStyleSheet("QSlider:focus { border: 1px solid #4A9EFF; }")
 
     def _decrease_wpm(self):
-        new_val = max(50, self.spinbox.value() - 25)
+        new_val = max(WPM_MIN, self.spinbox.value() - WPM_STEP)
         self.set_wpm(new_val)
 
     def _increase_wpm(self):
-        new_val = min(2000, self.spinbox.value() + 25)
+        new_val = min(WPM_MAX, self.spinbox.value() + WPM_STEP)
         self.set_wpm(new_val)
 
     def _on_slider_change(self, value):
@@ -168,7 +174,7 @@ class SpeedControl(QWidget):
 
     def _on_spinbox_change(self, value):
         self.slider.blockSignals(True)
-        self.slider.setValue(min(value, 1000))
+        self.slider.setValue(min(value, WPM_SLIDER_MAX))
         self.slider.blockSignals(False)
         self.wpm_changed.emit(value)
 
@@ -177,7 +183,7 @@ class SpeedControl(QWidget):
         self.spinbox.blockSignals(True)
         self.slider.blockSignals(True)
         self.spinbox.setValue(wpm)
-        self.slider.setValue(min(wpm, 1000))
+        self.slider.setValue(min(wpm, WPM_SLIDER_MAX))
         self.spinbox.blockSignals(False)
         self.slider.blockSignals(False)
         self.wpm_changed.emit(wpm)

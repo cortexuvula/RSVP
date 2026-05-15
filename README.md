@@ -32,8 +32,22 @@ pip install -e .
 
 ### Requirements
 
-- Python 3.9 or higher
+- Python 3.10 or higher
 - PyQt6
+
+### Development
+
+```bash
+# Install dev dependencies (pytest, ruff, etc.)
+pip install -e ".[dev]"
+
+# Run the test suite (Qt offscreen needed in headless environments)
+QT_QPA_PLATFORM=offscreen pytest tests/ --cov=rsvp
+
+# Lint and format
+ruff check .
+ruff format .
+```
 
 ## Usage
 
@@ -112,4 +126,4 @@ Each word has an Optimal Recognition Point - the character position where the ey
 
 ## License
 
-MIT License
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

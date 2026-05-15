@@ -1,14 +1,22 @@
 """Settings dialog."""
+
 from dataclasses import asdict
 
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout,
-    QGroupBox, QSpinBox, QPushButton,
-    QColorDialog, QFontComboBox, QCheckBox,
-    QDialogButtonBox
-)
 from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QColorDialog,
+    QDialog,
+    QDialogButtonBox,
+    QFontComboBox,
+    QFormLayout,
+    QGroupBox,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+)
 
+from rsvp.core.constants import FONT_SIZE_MAX, FONT_SIZE_MIN, WPM_MAX, WPM_MIN
 from rsvp.core.settings import get_settings_manager
 
 
@@ -66,7 +74,7 @@ class SettingsDialog(QDialog):
         display_layout.addRow("Font:", self.font_combo)
 
         self.font_size_spin = QSpinBox()
-        self.font_size_spin.setRange(12, 120)
+        self.font_size_spin.setRange(FONT_SIZE_MIN, FONT_SIZE_MAX)
         self.font_size_spin.setSuffix(" pt")
         display_layout.addRow("Font Size:", self.font_size_spin)
 
@@ -87,7 +95,7 @@ class SettingsDialog(QDialog):
         speed_layout = QFormLayout()
 
         self.default_wpm_spin = QSpinBox()
-        self.default_wpm_spin.setRange(50, 2000)
+        self.default_wpm_spin.setRange(WPM_MIN, WPM_MAX)
         self.default_wpm_spin.setSuffix(" wpm")
         speed_layout.addRow("Default WPM:", self.default_wpm_spin)
 
@@ -112,9 +120,9 @@ class SettingsDialog(QDialog):
 
         # Buttons
         button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok |
-            QDialogButtonBox.StandardButton.Cancel |
-            QDialogButtonBox.StandardButton.Apply
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+            | QDialogButtonBox.StandardButton.Apply
         )
         button_box.accepted.connect(self._save_and_accept)
         button_box.rejected.connect(self.reject)

@@ -1,13 +1,17 @@
 """Tests for text_processor module."""
+
 import os
+
 import pytest
+
 from rsvp.core.text_processor import (
     Word,
     calculate_orp,
     calculate_pause_multiplier,
-    process_text,
     extract_text_from_html,
+    fetch_text_from_url,
     load_text_from_file,
+    process_text,
     strip_markdown,
 )
 
@@ -277,9 +281,9 @@ class TestParagraphBreakDetection:
 
     def test_multiple_paragraph_breaks(self):
         words = process_text("One.\n\nTwo.\n\nThree.")
-        assert words[0].paragraph_break_after is True   # "One."
-        assert words[1].paragraph_break_after is True   # "Two."
-        assert words[2].paragraph_break_after is False   # "Three." (last paragraph)
+        assert words[0].paragraph_break_after is True  # "One."
+        assert words[1].paragraph_break_after is True  # "Two."
+        assert words[2].paragraph_break_after is False  # "Three." (last paragraph)
 
     def test_last_paragraph_not_marked(self):
         words = process_text("First para.\n\nSecond para.")
@@ -477,3 +481,62 @@ class TestLoadPdf:
     def test_pdf_pages_separated(self, pdf_path):
         result = load_text_from_file(pdf_path)
         assert "\n\n" in result
+
+
+class TestFetchTextFromUrl:
+    """Tests for URL fetching scheme validation."""
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "",
+            "   ",
+        ],
+    )
+    def test_empty_url_rejected(self, url):
+        with pytest.raises(ValueError, match="empty"):
+            fetch_text_from_url(url)
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "file:///etc/passwd",
+            "ftp://example.com/file.txt",
+            "javascript:alert(1)",
+            "data:text/plain;base64,SGVsbG8=",
+            "gopher://example.com/",
+            "/relative/path",
+            "example.com",
+            "//example.com/no-scheme",
+        ],
+    )
+    def test_non_http_schemes_rejected(self, url):
+        with pytest.raises(ValueError):
+            fetch_text_from_url(url)
+
+    def test_missing_host_rejected(self):
+        with pytest.raises(ValueError, match="host"):
+            fetch_text_from_url("http://")
+
+    def test_http_url_accepted_for_validation(self, monkeypatch):
+        """Validate that an http URL passes the scheme check; mock the network call."""
+        captured = {}
+
+        class FakeResponse:
+            text = "<html><body>ok</body></html>"
+
+            def raise_for_status(self):
+                return None
+
+        def fake_get(url, headers=None, timeout=None):
+            captured["url"] = url
+            captured["timeout"] = timeout
+            return FakeResponse()
+
+        import requests
+
+        monkeypatch.setattr(requests, "get", fake_get)
+        result = fetch_text_from_url("https://example.com/article")
+        assert "ok" in result
+        assert captured["url"] == "https://example.com/article"
+        assert captured["timeout"] == 10

@@ -1,22 +1,31 @@
 """RSVP playback engine."""
+
 from dataclasses import dataclass, field
-from typing import Optional
+
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
-from rsvp.core.text_processor import Word, process_text
+from rsvp.core.constants import (
+    DEFAULT_SKIP_WORDS,
+    PAUSE_PARAGRAPH,
+    WPM_DEFAULT,
+    WPM_MAX,
+    WPM_MIN,
+)
 from rsvp.core.settings import get_settings_manager
+from rsvp.core.text_processor import Word, process_text
 
 
 @dataclass
 class RSVPState:
     """Current state of the RSVP engine."""
+
     words: list[Word] = field(default_factory=list)
     current_index: int = 0
-    wpm: int = 300
+    wpm: int = WPM_DEFAULT
     is_playing: bool = False
 
     @property
-    def current_word(self) -> Optional[Word]:
+    def current_word(self) -> Word | None:
         """Get the current word."""
         if 0 <= self.current_index < len(self.words):
             return self.words[self.current_index]
@@ -42,7 +51,7 @@ class RSVPState:
         if self.wpm <= 0:
             return 0.0
         base_interval = 60.0 / self.wpm
-        return sum(base_interval * w.pause_after for w in self.words[self.current_index:])
+        return sum(base_interval * w.pause_after for w in self.words[self.current_index :])
 
 
 class RSVPEngine(QObject):
@@ -73,7 +82,7 @@ class RSVPEngine(QObject):
     @wpm.setter
     def wpm(self, value: int):
         """Set words per minute."""
-        self._state.wpm = max(50, min(2000, value))
+        self._state.wpm = max(WPM_MIN, min(WPM_MAX, value))
         if self._state.is_playing:
             self._update_timer_interval()
 
@@ -161,11 +170,11 @@ class RSVPEngine(QObject):
             index = round((percent / 100) * (len(self._state.words) - 1))
         self.seek(index)
 
-    def skip_forward(self, words: int = 10):
+    def skip_forward(self, words: int = DEFAULT_SKIP_WORDS):
         """Skip forward by a number of words."""
         self.seek(self._state.current_index + words)
 
-    def skip_backward(self, words: int = 10):
+    def skip_backward(self, words: int = DEFAULT_SKIP_WORDS):
         """Skip backward by a number of words."""
         self.seek(self._state.current_index - words)
 
@@ -179,13 +188,13 @@ class RSVPEngine(QObject):
 
         # Skip past any contiguous sentence-ending words at the start position.
         # This prevents getting stuck when already at a sentence boundary.
-        while idx > 0 and self._state.words[idx].text and self._state.words[idx].text[-1] in '.!?':
+        while idx > 0 and self._state.words[idx].text and self._state.words[idx].text[-1] in ".!?":
             idx -= 1
 
         # Find the previous sentence-ending punctuation
         while idx > 0:
             word = self._state.words[idx]
-            if word.text and word.text[-1] in '.!?':
+            if word.text and word.text[-1] in ".!?":
                 # Found end of previous sentence, go to start of next
                 self.seek(idx + 1)
                 return
@@ -204,7 +213,7 @@ class RSVPEngine(QObject):
         # Find the next sentence-ending punctuation
         while idx < len(self._state.words) - 1:
             word = self._state.words[idx]
-            if word.text and word.text[-1] in '.!?':
+            if word.text and word.text[-1] in ".!?":
                 # Found end of sentence, go to start of next
                 self.seek(idx + 1)
                 return
@@ -221,7 +230,7 @@ class RSVPEngine(QObject):
         if current:
             interval = base_interval * current.pause_after
             if current.paragraph_break_after and get_settings_manager().settings.pause_at_paragraphs:
-                interval *= 3.0
+                interval *= PAUSE_PARAGRAPH
         else:
             interval = base_interval
 

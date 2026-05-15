@@ -1,9 +1,10 @@
 """Word display widget with ORP highlighting."""
-from PyQt6.QtWidgets import QWidget, QVBoxLayout
-from PyQt6.QtGui import QFont, QPainter, QColor, QFontMetrics
 
-from rsvp.core.text_processor import Word
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter
+from PyQt6.QtWidgets import QVBoxLayout, QWidget
+
 from rsvp.core.settings import get_settings_manager
+from rsvp.core.text_processor import Word
 
 
 class ORPWordDisplay(QWidget):
@@ -59,7 +60,6 @@ class ORPWordDisplay(QWidget):
         fm = QFontMetrics(self._font)
 
         # Calculate text dimensions
-        text = self._word.text
         before = self._word.before_orp
         orp_char = self._word.orp_char
         after = self._word.after_orp
@@ -75,8 +75,9 @@ class ORPWordDisplay(QWidget):
         # Draw ORP indicator line (vertical red line at center)
         indicator_height = fm.height() + 20
         painter.setPen(self._orp_color)
-        painter.drawLine(center_x, center_y - indicator_height // 2,
-                        center_x, center_y + indicator_height // 2)
+        painter.drawLine(
+            center_x, center_y - indicator_height // 2, center_x, center_y + indicator_height // 2
+        )
 
         # Position text so ORP char is centered
         text_y = center_y + fm.ascent() // 2

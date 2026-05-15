@@ -1,12 +1,22 @@
 """Dialog for text input."""
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTabWidget,
-    QWidget, QTextEdit, QLineEdit, QPushButton,
-    QLabel, QFileDialog, QMessageBox
-)
-from PyQt6.QtCore import Qt
 
-from rsvp.core.text_processor import load_text_from_file, fetch_text_from_url
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTabWidget,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+
+from rsvp.core.constants import PREVIEW_MAX_CHARS
+from rsvp.core.text_processor import fetch_text_from_url, load_text_from_file
 
 
 class TextInputDialog(QDialog):
@@ -115,12 +125,14 @@ class TextInputDialog(QDialog):
         """Paste text from clipboard."""
         try:
             import pyperclip
+
             text = pyperclip.paste()
             if text:
                 self.text_edit.setPlainText(text)
         except Exception:
             # Fallback to Qt clipboard
             from PyQt6.QtWidgets import QApplication
+
             clipboard = QApplication.clipboard()
             self.text_edit.setPlainText(clipboard.text())
 
@@ -136,14 +148,15 @@ class TextInputDialog(QDialog):
             "HTML (*.html *.htm);;"
             "EPUB (*.epub);;"
             "PDF (*.pdf);;"
-            "All Files (*)"
+            "All Files (*)",
         )
 
         if filepath:
             try:
                 text = load_text_from_file(filepath)
                 self.file_path_edit.setText(filepath)
-                self.file_preview.setPlainText(text[:5000] + ("..." if len(text) > 5000 else ""))
+                truncated = len(text) > PREVIEW_MAX_CHARS
+                self.file_preview.setPlainText(text[:PREVIEW_MAX_CHARS] + ("..." if truncated else ""))
                 self._source_path = filepath
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Failed to load file: {e}")
@@ -155,11 +168,14 @@ class TextInputDialog(QDialog):
             return
 
         from PyQt6.QtWidgets import QApplication
+
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             text = fetch_text_from_url(url)
-            self._url_text_truncated = len(text) > 5000
-            self.url_preview.setPlainText(text[:5000] + ("..." if self._url_text_truncated else ""))
+            self._url_text_truncated = len(text) > PREVIEW_MAX_CHARS
+            self.url_preview.setPlainText(
+                text[:PREVIEW_MAX_CHARS] + ("..." if self._url_text_truncated else "")
+            )
             self._source_path = url
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to fetch URL: {e}")

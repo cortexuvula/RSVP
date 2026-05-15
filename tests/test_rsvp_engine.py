@@ -1,7 +1,9 @@
 """Tests for rsvp_engine module."""
+
 import pytest
-from rsvp.core.text_processor import Word, process_text
-from rsvp.core.rsvp_engine import RSVPState, RSVPEngine
+
+from rsvp.core.rsvp_engine import RSVPEngine, RSVPState
+from rsvp.core.text_processor import process_text
 
 
 class TestRSVPState:
@@ -615,6 +617,7 @@ class TestRSVPEngineParagraphPause:
 
     def test_paragraph_pause_disabled_in_settings(self, qapp):
         from rsvp.core.settings import get_settings_manager
+
         manager = get_settings_manager()
         original = manager.settings.pause_at_paragraphs
         try:

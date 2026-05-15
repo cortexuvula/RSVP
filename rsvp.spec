@@ -1,10 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller spec file for RSVP Reader."""
 
+import re
 import sys
 from pathlib import Path
 
 block_cipher = None
+
+# Read version from rsvp/__init__.py (single source of truth)
+_init_text = Path('rsvp/__init__.py').read_text(encoding='utf-8')
+_match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', _init_text, re.M)
+APP_VERSION = _match.group(1) if _match else '0.0.0'
 
 # Determine platform-specific settings
 if sys.platform == 'win32':
@@ -71,6 +77,6 @@ if sys.platform == 'darwin':
         bundle_identifier='com.rsvp.reader',
         info_plist={
             'NSHighResolutionCapable': 'True',
-            'CFBundleShortVersionString': '1.0.0',
+            'CFBundleShortVersionString': APP_VERSION,
         },
     )

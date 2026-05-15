@@ -1,18 +1,19 @@
 """Main application window."""
-from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QStatusBar, QFileDialog, QMessageBox, QLabel
-)
-from PyQt6.QtCore import Qt, QEvent
-from PyQt6.QtGui import QAction, QKeySequence, QShortcut
 
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStatusBar, QVBoxLayout, QWidget
+
+from rsvp.core.constants import WPM_MAX, WPM_MIN, WPM_STEP
 from rsvp.core.rsvp_engine import RSVPEngine
 from rsvp.core.settings import get_settings_manager
-from rsvp.core.text_processor import load_text_from_file
-from rsvp.ui.word_display import WordDisplayWidget
-from rsvp.ui.controls import PlaybackControls, SpeedControl, ProgressWidget
-from rsvp.ui.text_input_dialog import TextInputDialog
+from rsvp.ui.bookmark_controller import BookmarkController
+from rsvp.ui.controls import PlaybackControls, ProgressWidget, SpeedControl
+from rsvp.ui.document_loader import DocumentLoader
+from rsvp.ui.menu_builder import MenuBuilder
 from rsvp.ui.settings_dialog import SettingsDialog
+from rsvp.ui.text_input_dialog import TextInputDialog
+from rsvp.ui.word_display import WordDisplayWidget
 
 
 class MainWindow(QMainWindow):
@@ -24,6 +25,7 @@ class MainWindow(QMainWindow):
         self._engine = RSVPEngine()
         self._setup_ui()
         self._setup_menus()
+        self._setup_controllers()
         self._setup_shortcuts()
         self._connect_signals()
         self._load_window_settings()
@@ -31,12 +33,23 @@ class MainWindow(QMainWindow):
         self._setup_tab_order()
         self._check_settings_reset()
 
+    # ------------------------------------------------------------------
+    # Accessors used by MenuBuilder
+    # ------------------------------------------------------------------
+
+    @property
+    def engine(self) -> RSVPEngine:
+        return self._engine
+
+    # ------------------------------------------------------------------
+    # Setup
+    # ------------------------------------------------------------------
+
     def _setup_ui(self):
         """Set up the user interface."""
         self.setWindowTitle("RSVP Reader")
         self.setMinimumSize(600, 400)
 
-        # Central widget
         central = QWidget()
         self.setCentralWidget(central)
 
@@ -44,21 +57,17 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Word display (main area)
         self.word_display = WordDisplayWidget()
         layout.addWidget(self.word_display, stretch=1)
 
-        # Controls panel
         controls_panel = QWidget()
         controls_layout = QVBoxLayout(controls_panel)
         controls_layout.setContentsMargins(5, 5, 5, 5)
         controls_layout.setSpacing(5)
 
-        # Progress bar
         self.progress_widget = ProgressWidget()
         controls_layout.addWidget(self.progress_widget)
 
-        # Speed and playback controls row
         controls_row = QHBoxLayout()
 
         self.speed_control = SpeedControl()
@@ -70,133 +79,39 @@ class MainWindow(QMainWindow):
         controls_layout.addLayout(controls_row)
         layout.addWidget(controls_panel)
 
-        # Status bar
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
         self.status_label = QLabel("No text loaded")
         self.status_bar.addWidget(self.status_label)
 
-        # Apply settings
         self._apply_settings()
 
     def _setup_menus(self):
         """Set up the menu bar."""
-        menubar = self.menuBar()
-
-        # File menu
-        file_menu = menubar.addMenu("&File")
-
-        # Load text
-        load_action = QAction("&Load Text...", self)
-        load_action.setShortcut(QKeySequence.StandardKey.Open)
-        load_action.triggered.connect(self._load_text_dialog)
-        file_menu.addAction(load_action)
-
-        # Open file
-        open_action = QAction("&Open File...", self)
-        open_action.setShortcut("Ctrl+Shift+O")
-        open_action.triggered.connect(self._open_file)
-        file_menu.addAction(open_action)
-
-        file_menu.addSeparator()
-
-        # Recent files submenu
-        self.recent_menu = file_menu.addMenu("Recent Files")
+        refs = MenuBuilder(self, self).build()
+        self.recent_menu = refs.recent_menu
+        self.bookmarks_submenu = refs.bookmarks_submenu
+        self.always_on_top_action = refs.always_on_top_action
         self._update_recent_menu()
 
-        file_menu.addSeparator()
-
-        # Exit
-        exit_action = QAction("E&xit", self)
-        exit_action.setShortcut(QKeySequence.StandardKey.Quit)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-
-        # Edit menu
-        edit_menu = menubar.addMenu("&Edit")
-
-        # Paste and read
-        paste_action = QAction("&Paste and Read", self)
-        paste_action.setShortcut("Ctrl+V")
-        paste_action.triggered.connect(self._paste_and_read)
-        edit_menu.addAction(paste_action)
-
-        edit_menu.addSeparator()
-
-        # Settings
-        settings_action = QAction("&Settings...", self)
-        settings_action.setShortcut("Ctrl+,")
-        settings_action.triggered.connect(self._show_settings)
-        edit_menu.addAction(settings_action)
-
-        # View menu
-        view_menu = menubar.addMenu("&View")
-
-        # Always on top
-        self.always_on_top_action = QAction("Always on &Top", self)
-        self.always_on_top_action.setCheckable(True)
-        self.always_on_top_action.triggered.connect(self._toggle_always_on_top)
-        view_menu.addAction(self.always_on_top_action)
-
-        # Fullscreen
-        fullscreen_action = QAction("&Fullscreen", self)
-        fullscreen_action.setShortcut("F11")
-        fullscreen_action.triggered.connect(self._toggle_fullscreen)
-        view_menu.addAction(fullscreen_action)
-
-        # Playback menu
-        playback_menu = menubar.addMenu("&Playback")
-
-        play_action = QAction("&Play/Pause", self)
-        play_action.setShortcut("Space")
-        play_action.triggered.connect(self._engine.toggle_play_pause)
-        playback_menu.addAction(play_action)
-
-        stop_action = QAction("&Stop", self)
-        stop_action.setShortcut("S")
-        stop_action.triggered.connect(self._engine.stop)
-        playback_menu.addAction(stop_action)
-
-        playback_menu.addSeparator()
-
-        speed_up_action = QAction("Speed &Up (+/Up)", self)
-        speed_up_action.triggered.connect(self._speed_up)
-        playback_menu.addAction(speed_up_action)
-
-        speed_down_action = QAction("Speed &Down (-/Down)", self)
-        speed_down_action.triggered.connect(self._speed_down)
-        playback_menu.addAction(speed_down_action)
-
-        # Bookmarks menu
-        bookmarks_menu = menubar.addMenu("&Bookmarks")
-
-        add_bookmark_action = QAction("&Add Bookmark", self)
-        add_bookmark_action.setShortcut("Ctrl+B")
-        add_bookmark_action.triggered.connect(self._add_bookmark)
-        bookmarks_menu.addAction(add_bookmark_action)
-
-        remove_bookmark_action = QAction("&Remove Bookmark", self)
-        remove_bookmark_action.setShortcut("Ctrl+Shift+B")
-        remove_bookmark_action.triggered.connect(self._remove_bookmark)
-        bookmarks_menu.addAction(remove_bookmark_action)
-
-        bookmarks_menu.addSeparator()
-
-        self.bookmarks_submenu = bookmarks_menu.addMenu("Go to Bookmark")
-
-        # Help menu
-        help_menu = menubar.addMenu("&Help")
-
-        shortcuts_action = QAction("Keyboard &Shortcuts", self)
-        shortcuts_action.setShortcut("F1")
-        shortcuts_action.triggered.connect(self._show_shortcuts)
-        help_menu.addAction(shortcuts_action)
-
-        help_menu.addSeparator()
-
-        about_action = QAction("&About", self)
-        about_action.triggered.connect(self._show_about)
-        help_menu.addAction(about_action)
+    def _setup_controllers(self):
+        """Wire up the helpers that own bookmark + document-loading logic."""
+        self._bookmarks = BookmarkController(
+            parent_widget=self,
+            engine=self._engine,
+            submenu=self.bookmarks_submenu,
+            status_setter=self.status_label.setText,
+            current_file_getter=lambda: self._current_file,
+        )
+        self._documents = DocumentLoader(
+            parent_widget=self,
+            engine=self._engine,
+            status_setter=self.status_label.setText,
+            title_setter=self.setWindowTitle,
+            on_loaded=self._on_document_loaded,
+            current_file_getter=lambda: self._current_file,
+        )
+        self._bookmarks.refresh_menu()
 
     def _setup_shortcuts(self):
         """Set up keyboard shortcuts."""
@@ -207,13 +122,11 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self):
         """Connect signals between components."""
-        # Engine signals
         self._engine.word_changed.connect(self._on_word_changed)
         self._engine.state_changed.connect(self._on_state_changed)
         self._engine.progress_changed.connect(self._on_progress_changed)
         self._engine.finished.connect(self._on_finished)
 
-        # Control signals
         self.playback_controls.play_clicked.connect(self._engine.play)
         self.playback_controls.pause_clicked.connect(self._engine.pause)
         self.playback_controls.stop_clicked.connect(self._engine.stop)
@@ -253,29 +166,9 @@ class MainWindow(QMainWindow):
         self.setTabOrder(self.speed_control.slider, self.speed_control.spinbox)
         self.setTabOrder(self.speed_control.spinbox, self.word_display)
 
-    def _maybe_save_position(self):
-        """Save current reading position if auto-save is enabled."""
-        manager = get_settings_manager()
-        if not manager.settings.auto_save_position:
-            return
-        if self._current_file and self._engine.current_index > 0:
-            manager.save_position(self._current_file, self._engine.current_index)
-
-    def _maybe_resume_position(self, source: str):
-        """Offer to resume from saved position if available."""
-        manager = get_settings_manager()
-        if not manager.settings.auto_save_position or not source:
-            return
-        saved_index = manager.get_position(source)
-        if saved_index is not None and saved_index > 0 and saved_index < self._engine.word_count:
-            reply = QMessageBox.question(
-                self,
-                "Resume Reading",
-                f"Resume from word {saved_index} of {self._engine.word_count}?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                self._engine.seek(saved_index)
+    # ------------------------------------------------------------------
+    # Window settings
+    # ------------------------------------------------------------------
 
     def _load_window_settings(self):
         """Load window position and size from settings."""
@@ -319,6 +212,8 @@ class MainWindow(QMainWindow):
 
     def _update_recent_menu(self):
         """Update the recent files menu."""
+        from PyQt6.QtGui import QAction
+
         self.recent_menu.clear()
         settings = get_settings_manager().settings
 
@@ -332,79 +227,37 @@ class MainWindow(QMainWindow):
             no_recent.setEnabled(False)
             self.recent_menu.addAction(no_recent)
 
+    # ------------------------------------------------------------------
+    # Document loading (delegated)
+    # ------------------------------------------------------------------
+
     def _load_text_dialog(self):
         """Show the text input dialog."""
-        self._maybe_save_position()
         dialog = TextInputDialog(self)
         if dialog.exec():
-            text = dialog.get_text()
-            source = dialog.get_source_path()
-
-            self._engine.load_text(text)
-            self._current_file = source
-
-            if source:
-                get_settings_manager().add_recent_file(source)
-                self._update_recent_menu()
-                self.setWindowTitle(f"RSVP Reader - {source}")
-            else:
-                self.setWindowTitle("RSVP Reader")
-
-            self._update_bookmarks_menu()
-            self.status_label.setText(f"Loaded {self._engine.word_count} words")
-            self._maybe_resume_position(source)
+            self._documents.load_from_text_dialog(dialog.get_text(), dialog.get_source_path())
 
     def _open_file(self):
         """Open a file directly."""
-        filepath, _ = QFileDialog.getOpenFileName(
-            self,
-            "Open File",
-            "",
-            "All Supported (*.txt *.md *.html *.htm *.epub *.pdf);;"
-            "Text (*.txt);;"
-            "Markdown (*.md);;"
-            "HTML (*.html *.htm);;"
-            "EPUB (*.epub);;"
-            "PDF (*.pdf);;"
-            "All Files (*)"
-        )
-
-        if filepath:
-            self._load_file(filepath)
+        self._documents.open_file_dialog()
 
     def _load_file(self, filepath: str):
-        """Load a file."""
-        self._maybe_save_position()
-        try:
-            text = load_text_from_file(filepath)
-            self._engine.load_text(text)
-            self._current_file = filepath
-
-            get_settings_manager().add_recent_file(filepath)
-            self._update_recent_menu()
-            self._update_bookmarks_menu()
-
-            self.setWindowTitle(f"RSVP Reader - {filepath}")
-            self.status_label.setText(f"Loaded {self._engine.word_count} words")
-            self._maybe_resume_position(filepath)
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Failed to load file: {e}")
+        """Load a file by path (used by recent files menu)."""
+        self._documents.load_file(filepath)
 
     def _paste_and_read(self):
         """Paste from clipboard and start reading."""
-        try:
-            import pyperclip
-            text = pyperclip.paste()
-        except Exception:
-            from PyQt6.QtWidgets import QApplication
-            text = QApplication.clipboard().text()
+        self._documents.load_from_clipboard()
 
-        if text:
-            self._engine.load_text(text)
-            self._current_file = None
-            self.setWindowTitle("RSVP Reader - Clipboard")
-            self.status_label.setText(f"Loaded {self._engine.word_count} words from clipboard")
-            self._engine.play()
+    def _on_document_loaded(self, source):
+        """Hook called by DocumentLoader after each successful load."""
+        self._current_file = source
+        self._update_recent_menu()
+        self._bookmarks.refresh_menu()
+
+    # ------------------------------------------------------------------
+    # Dialogs / view toggles
+    # ------------------------------------------------------------------
 
     def _show_settings(self):
         """Show the settings dialog."""
@@ -419,9 +272,9 @@ class MainWindow(QMainWindow):
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, on_top)
         self.show()
 
-        settings = get_settings_manager()
-        settings.settings.always_on_top = on_top
-        settings.save()
+        manager = get_settings_manager()
+        manager.settings.always_on_top = on_top
+        manager.save()
 
     def _toggle_fullscreen(self):
         """Toggle fullscreen mode."""
@@ -432,75 +285,30 @@ class MainWindow(QMainWindow):
 
     def _speed_up(self):
         """Increase WPM."""
-        new_wpm = min(2000, self._engine.wpm + 25)
+        new_wpm = min(WPM_MAX, self._engine.wpm + WPM_STEP)
         self.speed_control.set_wpm(new_wpm)
 
     def _speed_down(self):
         """Decrease WPM."""
-        new_wpm = max(50, self._engine.wpm - 25)
+        new_wpm = max(WPM_MIN, self._engine.wpm - WPM_STEP)
         self.speed_control.set_wpm(new_wpm)
 
-    def _add_bookmark(self):
-        """Add a bookmark at current position."""
-        if not self._current_file:
-            QMessageBox.information(
-                self, "Bookmark",
-                "Bookmarks are only available for files."
-            )
-            return
+    # ------------------------------------------------------------------
+    # Bookmarks (delegated)
+    # ------------------------------------------------------------------
 
-        get_settings_manager().add_bookmark(
-            self._current_file,
-            self._engine.current_index
-        )
-        self._update_bookmarks_menu()
-        self.status_label.setText(f"Bookmark added at word {self._engine.current_index}")
+    def _add_bookmark(self):
+        self._bookmarks.add()
 
     def _remove_bookmark(self):
-        """Remove the bookmark at or nearest to the current position."""
-        if not self._current_file:
-            return
-
-        bookmarks = get_settings_manager().get_bookmarks(self._current_file)
-        if not bookmarks:
-            self.status_label.setText("No bookmarks to remove")
-            return
-
-        current = self._engine.current_index
-        if current in bookmarks:
-            get_settings_manager().remove_bookmark(self._current_file, current)
-            self._update_bookmarks_menu()
-            self.status_label.setText(f"Bookmark removed at word {current}")
-        else:
-            self.status_label.setText("No bookmark at current position")
+        self._bookmarks.remove()
 
     def _update_bookmarks_menu(self):
-        """Update the bookmarks submenu."""
-        self.bookmarks_submenu.clear()
+        self._bookmarks.refresh_menu()
 
-        if not self._current_file:
-            no_bookmarks = QAction("No bookmarks", self)
-            no_bookmarks.setEnabled(False)
-            self.bookmarks_submenu.addAction(no_bookmarks)
-            return
-
-        bookmarks = get_settings_manager().get_bookmarks(self._current_file)
-
-        if not bookmarks:
-            no_bookmarks = QAction("No bookmarks", self)
-            no_bookmarks.setEnabled(False)
-            self.bookmarks_submenu.addAction(no_bookmarks)
-            return
-
-        words = self._engine.state.words
-        for idx in bookmarks:
-            if idx < len(words):
-                label = f"Word {idx}: \"{words[idx].text}\""
-            else:
-                label = f"Word {idx}"
-            action = QAction(label, self)
-            action.triggered.connect(lambda checked, i=idx: self._engine.seek(i))
-            self.bookmarks_submenu.addAction(action)
+    # ------------------------------------------------------------------
+    # Help dialogs
+    # ------------------------------------------------------------------
 
     def _show_shortcuts(self):
         """Show keyboard shortcuts help."""
@@ -526,15 +334,21 @@ class MainWindow(QMainWindow):
 
     def _show_about(self):
         """Show about dialog."""
+        from rsvp import __version__
+
         QMessageBox.about(
             self,
             "About RSVP Reader",
-            "<h2>RSVP Reader</h2>"
-            "<p>Version 1.2.0</p>"
+            f"<h2>RSVP Reader</h2>"
+            f"<p>Version {__version__}</p>"
             "<p>A Rapid Serial Visual Presentation speed reading application.</p>"
             "<p>RSVP displays text one word at a time with the Optimal Recognition "
-            "Point (ORP) highlighted, allowing for faster reading speeds.</p>"
+            "Point (ORP) highlighted, allowing for faster reading speeds.</p>",
         )
+
+    # ------------------------------------------------------------------
+    # Signal handlers
+    # ------------------------------------------------------------------
 
     def _on_word_changed(self, word):
         """Handle word changed signal."""
@@ -548,10 +362,7 @@ class MainWindow(QMainWindow):
         """Handle progress changed signal."""
         state = self._engine.state
         self.progress_widget.update_progress(
-            progress,
-            state.current_index,
-            len(state.words),
-            state.time_remaining_seconds
+            progress, state.current_index, len(state.words), state.time_remaining_seconds
         )
 
     def _on_wpm_changed(self, wpm):
@@ -564,6 +375,10 @@ class MainWindow(QMainWindow):
         if self._current_file:
             get_settings_manager().clear_position(self._current_file)
 
+    # ------------------------------------------------------------------
+    # Notifications / lifecycle
+    # ------------------------------------------------------------------
+
     def _check_settings_reset(self):
         """Show notification if settings were reset due to corruption."""
         if get_settings_manager().was_reset():
@@ -574,8 +389,14 @@ class MainWindow(QMainWindow):
                 "A backup was saved to settings.json.bak.",
             )
 
+    def _check_settings_save_failed(self):
+        """Show notification if settings could not be saved (e.g. read-only filesystem)."""
+        if get_settings_manager().save_failed():
+            self.status_label.setText("Warning: settings could not be saved (filesystem error)")
+
     def closeEvent(self, event):
         """Handle window close."""
-        self._maybe_save_position()
+        self._documents.maybe_save_position()
         self._save_window_settings()
+        self._check_settings_save_failed()
         event.accept()
