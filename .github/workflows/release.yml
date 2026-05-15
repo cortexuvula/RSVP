@@ -17,7 +17,7 @@ jobs:
             artifact_path: dist/RSVP Reader.exe
           - os: macos-latest
             artifact_name: RSVP-Reader-macOS
-            asset_name: RSVP-Reader-macOS.zip
+            asset_name: RSVP-Reader-macOS.dmg
             artifact_path: dist/RSVP Reader.app
           - os: ubuntu-latest
             artifact_name: RSVP-Reader-Linux
@@ -140,19 +140,68 @@ jobs:
           xcrun stapler staple "$APP"
           xcrun stapler validate "$APP"
 
+      # ----------- macOS: build DMG, sign, notarize, staple -----------
+      - name: Build DMG (drag-to-Applications layout)
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          brew install create-dmg
+
+          APP="dist/RSVP Reader.app"
+          DMG="dist/${{ matrix.asset_name }}"
+
+          create-dmg \
+            --volname "RSVP Reader" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "RSVP Reader.app" 175 190 \
+            --hide-extension "RSVP Reader.app" \
+            --app-drop-link 425 190 \
+            --no-internet-enable \
+            "$DMG" \
+            "$APP"
+
+      - name: Codesign DMG
+        if: runner.os == 'macOS'
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          DMG="dist/${{ matrix.asset_name }}"
+          /usr/bin/codesign \
+            --force \
+            --timestamp \
+            --sign "$MACOS_SIGNING_IDENTITY" \
+            "$DMG"
+          /usr/bin/codesign --verify --verbose=2 "$DMG"
+
+      - name: Notarize and staple DMG
+        if: runner.os == 'macOS'
+        env:
+          MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+          MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+          MACOS_NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          DMG="dist/${{ matrix.asset_name }}"
+
+          xcrun notarytool submit "$DMG" \
+            --apple-id "$MACOS_NOTARY_APPLE_ID" \
+            --team-id "$MACOS_NOTARY_TEAM_ID" \
+            --password "$MACOS_NOTARY_PASSWORD" \
+            --wait
+
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+
       - name: Clean up keychain
         if: always() && runner.os == 'macOS'
         run: |
           security delete-keychain "$RUNNER_TEMP/build.keychain-db" || true
           rm -f "$RUNNER_TEMP/cert.p12"
 
-      # ----------- Package final artifacts -----------
-      - name: Prepare macOS artifact
-        if: runner.os == 'macOS'
-        run: |
-          cd dist
-          /usr/bin/ditto -c -k --keepParent "RSVP Reader.app" "RSVP Reader.zip"
-
+      # ----------- Rename non-macOS artifacts -----------
       - name: Rename artifact for release (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -162,11 +211,6 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           cp "dist/RSVP Reader" "dist/${{ matrix.asset_name }}"
-
-      - name: Rename artifact for release (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          cp "dist/RSVP Reader.zip" "dist/${{ matrix.asset_name }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -195,7 +239,7 @@ jobs:
         with:
           files: |
             artifacts/RSVP-Reader-Windows/RSVP-Reader-Windows.exe
-            artifacts/RSVP-Reader-macOS/RSVP-Reader-macOS.zip
+            artifacts/RSVP-Reader-macOS/RSVP-Reader-macOS.dmg
             artifacts/RSVP-Reader-Linux/RSVP-Reader-Linux
           generate_release_notes: true
           draft: false

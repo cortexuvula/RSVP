@@ -1,6 +1,6 @@
 # macOS code signing & notarization — setup
 
-The release workflow (`.github/workflows/release.yml`) signs the `RSVP Reader.app` bundle with your Developer ID Application certificate, submits it to Apple's notary service, and staples the ticket. This document is the one-time setup to make that work.
+The release workflow (`.github/workflows/release.yml`) signs the `RSVP Reader.app` bundle with your Developer ID Application certificate, submits it to Apple's notary service, staples the ticket, packages the app into a drag-to-Applications DMG, and then signs and notarizes the DMG itself. This document is the one-time setup to make that work.
 
 You need to add **six GitHub Actions secrets** to the repo: three for the certificate, three for notarization.
 
@@ -81,7 +81,7 @@ git tag v0.1.0
 git push --tags
 ```
 
-The workflow fires on any tag matching `v*`. Watch the macOS job in the Actions tab — the steps to look for are **Import signing certificate into keychain**, **Codesign app bundle**, and **Notarize and staple**.
+The workflow fires on any tag matching `v*`. Watch the macOS job in the Actions tab — the steps to look for are **Import signing certificate into keychain**, **Codesign app bundle**, **Notarize and staple**, **Build DMG**, **Codesign DMG**, and **Notarize and staple DMG**.
 
 Typical timings on the `macos-latest` runner:
 
@@ -103,17 +103,22 @@ The log will tell you which binary in the bundle failed (most common cause: a ne
 
 ## 6. Verify the released artifact
 
-Download `RSVP-Reader-macOS.zip` from the GitHub release on any Mac and run:
+Download `RSVP-Reader-macOS.dmg` from the GitHub release on any Mac and run:
 
 ```sh
-unzip RSVP-Reader-macOS.zip
-spctl -a -vvv -t exec "RSVP Reader.app"
+# Verify the DMG itself is signed and notarized
+spctl -a -vvv -t open --context context:primary-signature RSVP-Reader-macOS.dmg
+
+# Mount, then verify the .app inside
+hdiutil attach RSVP-Reader-macOS.dmg
+spctl -a -vvv -t exec "/Volumes/RSVP Reader/RSVP Reader.app"
+hdiutil detach "/Volumes/RSVP Reader"
 ```
 
-Expected output:
+Expected output for each:
 
 ```
-RSVP Reader.app: accepted
+…: accepted
 source=Notarized Developer ID
 ```
 
@@ -140,4 +145,4 @@ These are the minimum entitlements that let notarization pass while keeping the 
 
 ## What about the `developerID_installer.cer`?
 
-That's for signing `.pkg` installers. You're shipping a `.app` inside a `.zip`, so it's not used by this workflow. If you ever switch to a `.pkg` installer (e.g. via `pkgbuild` / `productbuild`), you'd add a `productsign --sign "Developer ID Installer: …"` step and add a second signing identity secret.
+That's for signing `.pkg` installers. You're shipping a `.app` inside a `.dmg`, both signed with the Developer ID Application cert, so it's not used by this workflow. If you ever switch to a `.pkg` installer (e.g. via `pkgbuild` / `productbuild`), you'd add a `productsign --sign "Developer ID Installer: …"` step and add a second signing identity secret.
