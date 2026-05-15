@@ -58,11 +58,100 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller rsvp.spec
 
+      # ----------- macOS: sign, notarize, staple -----------
+      - name: Import signing certificate into keychain
+        if: runner.os == 'macOS'
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_P12_PASSWORD }}
+          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/cert.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+
+          # Decode the base64 .p12 secret to a file
+          echo "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$CERT_PATH"
+
+          # Create a throwaway keychain just for this build
+          security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import the cert + private key
+          security import "$CERT_PATH" \
+            -P "$MACOS_CERTIFICATE_P12_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+
+          # Allow codesign to use the key without a UI prompt
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Put the new keychain at the front of the search list (keep the user keychain too)
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
+          # Show what identities are visible (sanity check; safe to print)
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+      - name: Codesign app bundle (hardened runtime, deep)
+        if: runner.os == 'macOS'
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          APP="dist/RSVP Reader.app"
+
+          # Sign every nested binary first, then the bundle, with hardened runtime + timestamp.
+          /usr/bin/codesign \
+            --force \
+            --deep \
+            --options runtime \
+            --timestamp \
+            --entitlements packaging/macos/entitlements.plist \
+            --sign "$MACOS_SIGNING_IDENTITY" \
+            "$APP"
+
+          # Verify
+          /usr/bin/codesign --verify --strict --verbose=2 "$APP"
+          /usr/bin/codesign --display --verbose=4 "$APP" | head -20
+
+      - name: Notarize and staple
+        if: runner.os == 'macOS'
+        env:
+          MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+          MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+          MACOS_NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          APP="dist/RSVP Reader.app"
+          NOTARY_ZIP="$RUNNER_TEMP/RSVP-Reader-notary.zip"
+
+          # ditto preserves bundle structure (zip CLI mangles symlinks/perms)
+          /usr/bin/ditto -c -k --keepParent "$APP" "$NOTARY_ZIP"
+
+          # Submit and wait for the result (Apple usually takes 1-5 min)
+          xcrun notarytool submit "$NOTARY_ZIP" \
+            --apple-id "$MACOS_NOTARY_APPLE_ID" \
+            --team-id "$MACOS_NOTARY_TEAM_ID" \
+            --password "$MACOS_NOTARY_PASSWORD" \
+            --wait
+
+          # Staple the ticket onto the .app so it works offline
+          xcrun stapler staple "$APP"
+          xcrun stapler validate "$APP"
+
+      - name: Clean up keychain
+        if: always() && runner.os == 'macOS'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/build.keychain-db" || true
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      # ----------- Package final artifacts -----------
       - name: Prepare macOS artifact
         if: runner.os == 'macOS'
         run: |
           cd dist
-          zip -r "RSVP Reader.zip" "RSVP Reader.app"
+          /usr/bin/ditto -c -k --keepParent "RSVP Reader.app" "RSVP Reader.zip"
 
       - name: Rename artifact for release (Windows)
         if: runner.os == 'Windows'
