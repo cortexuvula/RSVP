@@ -3,7 +3,9 @@
 import logging
 import os
 import sys
+from pathlib import Path
 
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 
 from rsvp import __version__
@@ -21,6 +23,20 @@ def _configure_logging():
     )
 
 
+def _resolve_icon_path() -> Path | None:
+    """Locate icon.png in both dev runs and PyInstaller bundles."""
+    bundle_dir = getattr(sys, "_MEIPASS", None)
+    candidates = []
+    if bundle_dir:
+        candidates.append(Path(bundle_dir) / "assets" / "icon.png")
+    repo_root = Path(__file__).resolve().parent.parent
+    candidates.append(repo_root / "assets" / "icon.png")
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
+
+
 def main():
     """Run the RSVP application."""
     _configure_logging()
@@ -28,6 +44,10 @@ def main():
     app.setApplicationName("RSVP Reader")
     app.setApplicationVersion(__version__)
     app.setOrganizationName("RSVP")
+
+    icon_path = _resolve_icon_path()
+    if icon_path is not None:
+        app.setWindowIcon(QIcon(str(icon_path)))
 
     # Enable high DPI scaling
     app.setStyle("Fusion")

@@ -14,20 +14,24 @@ APP_VERSION = _match.group(1) if _match else '0.0.0'
 
 # Determine platform-specific settings
 if sys.platform == 'win32':
-    icon_file = 'icon.ico' if Path('icon.ico').exists() else None
+    icon_file = 'assets/icon.ico' if Path('assets/icon.ico').exists() else None
     console = False
 elif sys.platform == 'darwin':
-    icon_file = 'icon.icns' if Path('icon.icns').exists() else None
+    icon_file = 'assets/icon.icns' if Path('assets/icon.icns').exists() else None
     console = False
 else:
     icon_file = None
     console = False
 
+# Runtime PNG bundled for QIcon (window icon / dock / taskbar at runtime).
+runtime_png = Path('assets/icon.png')
+runtime_datas = [(str(runtime_png), 'assets')] if runtime_png.exists() else []
+
 a = Analysis(
     ['rsvp/main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=runtime_datas,
     hiddenimports=[
         'PyQt6.QtCore',
         'PyQt6.QtGui',
