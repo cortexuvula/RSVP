@@ -2,6 +2,7 @@
 
 import logging
 
+import requests
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog,
@@ -134,8 +135,10 @@ class TextInputDialog(QDialog):
             if text:
                 self.text_edit.setPlainText(text)
                 logger.debug("Pasted %d chars from clipboard via pyperclip", len(text))
-        except Exception:
-            # Fallback to Qt clipboard
+        except (ImportError, OSError) as e:
+            # pyperclip may be missing, or the system clipboard helper (xclip/xsel)
+            # is unavailable on Linux. Fall back to Qt's clipboard.
+            logger.debug("pyperclip unavailable, falling back to Qt clipboard: %s", e)
             from PyQt6.QtWidgets import QApplication
 
             clipboard = QApplication.clipboard()
@@ -163,7 +166,8 @@ class TextInputDialog(QDialog):
                 truncated = len(text) > PREVIEW_MAX_CHARS
                 self.file_preview.setPlainText(text[:PREVIEW_MAX_CHARS] + ("..." if truncated else ""))
                 self._source_path = filepath
-            except Exception as e:
+            except (OSError, ValueError) as e:
+                logger.exception("Failed to load file: %s", filepath)
                 QMessageBox.warning(self, "Error", f"Failed to load file: {e}")
 
     def _fetch_url(self):
@@ -183,7 +187,8 @@ class TextInputDialog(QDialog):
             )
             self._source_path = url
             logger.info("Fetched URL %s (%d chars)", url, len(text))
-        except Exception as e:
+        except (requests.RequestException, ValueError) as e:
+            logger.exception("Failed to fetch URL: %s", url)
             QMessageBox.warning(self, "Error", f"Failed to fetch URL: {e}")
         finally:
             QApplication.restoreOverrideCursor()
@@ -199,7 +204,8 @@ class TextInputDialog(QDialog):
             if self.file_path_edit.text():
                 try:
                     self._text = load_text_from_file(self.file_path_edit.text())
-                except Exception as e:
+                except (OSError, ValueError) as e:
+                    logger.exception("Failed to load file: %s", self.file_path_edit.text())
                     QMessageBox.warning(self, "Error", f"Failed to load file: {e}")
                     return
             else:
@@ -209,7 +215,8 @@ class TextInputDialog(QDialog):
                 # Preview was truncated, fetch full text
                 try:
                     self._text = fetch_text_from_url(self.url_edit.text().strip())
-                except Exception as e:
+                except (requests.RequestException, ValueError) as e:
+                    logger.exception("Failed to fetch URL: %s", self.url_edit.text().strip())
                     QMessageBox.warning(self, "Error", f"Failed to fetch URL: {e}")
                     return
             else:
