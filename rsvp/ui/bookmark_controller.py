@@ -22,7 +22,7 @@ class BookmarkController:
         submenu: QMenu,
         status_setter: Callable[[str], None],
         current_file_getter: Callable[[], str | None],
-    ):
+    ) -> None:
         self._parent = parent_widget
         self._engine = engine
         self._submenu = submenu

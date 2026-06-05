@@ -38,7 +38,7 @@ class DocumentLoader:
         title_setter: Callable[[str], None],
         on_loaded: Callable[[str | None], None],
         current_file_getter: Callable[[], str | None],
-    ):
+    ) -> None:
         self._parent = parent_widget
         self._engine = engine
         self._set_status = status_setter

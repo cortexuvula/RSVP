@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class MainWindow(QMainWindow):
     """Main application window."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._current_file = None
         self._engine = RSVPEngine()
@@ -50,7 +50,7 @@ class MainWindow(QMainWindow):
     # Setup
     # ------------------------------------------------------------------
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Set up the user interface."""
         self.setWindowTitle("RSVP Reader")
         self.setMinimumSize(600, 400)
@@ -91,7 +91,7 @@ class MainWindow(QMainWindow):
 
         self._apply_settings()
 
-    def _setup_menus(self):
+    def _setup_menus(self) -> None:
         """Set up the menu bar."""
         refs = MenuBuilder(self, self).build()
         self.recent_menu = refs.recent_menu
@@ -99,7 +99,7 @@ class MainWindow(QMainWindow):
         self.always_on_top_action = refs.always_on_top_action
         self._update_recent_menu()
 
-    def _setup_controllers(self):
+    def _setup_controllers(self) -> None:
         """Wire up the helpers that own bookmark + document-loading logic."""
         self._bookmarks = BookmarkController(
             parent_widget=self,
@@ -118,14 +118,14 @@ class MainWindow(QMainWindow):
         )
         self._bookmarks.refresh_menu()
 
-    def _setup_shortcuts(self):
+    def _setup_shortcuts(self) -> None:
         """Set up keyboard shortcuts."""
         QShortcut(QKeySequence("Shift+Left"), self, self._engine.previous_sentence)
         QShortcut(QKeySequence("Shift+Right"), self, self._engine.next_sentence)
         QShortcut(QKeySequence("Home"), self, lambda: self._engine.seek(0))
         QShortcut(QKeySequence("End"), self, lambda: self._engine.seek(self._engine.word_count - 1))
 
-    def _connect_signals(self):
+    def _connect_signals(self) -> None:
         """Connect signals between components."""
         self._engine.word_changed.connect(self._on_word_changed)
         self._engine.state_changed.connect(self._on_state_changed)
@@ -143,7 +143,7 @@ class MainWindow(QMainWindow):
         self.speed_control.wpm_changed.connect(self._on_wpm_changed)
         self.progress_widget.seek_requested.connect(self._engine.seek_percent)
 
-    def eventFilter(self, obj, event):
+    def eventFilter(self, obj, event) -> bool:
         """Handle focus-aware keyboard navigation."""
         if event.type() == QEvent.Type.KeyPress:
             key = event.key()
@@ -166,7 +166,7 @@ class MainWindow(QMainWindow):
                 return True
         return super().eventFilter(obj, event)
 
-    def _setup_tab_order(self):
+    def _setup_tab_order(self) -> None:
         """Set up Tab key navigation order."""
         self.setTabOrder(self.speed_control.slider, self.speed_control.spinbox)
         self.setTabOrder(self.speed_control.spinbox, self.word_display)
@@ -175,7 +175,7 @@ class MainWindow(QMainWindow):
     # Window settings
     # ------------------------------------------------------------------
 
-    def _load_window_settings(self):
+    def _load_window_settings(self) -> None:
         """Load window position and size from settings."""
         settings = get_settings_manager().settings
 
@@ -190,7 +190,7 @@ class MainWindow(QMainWindow):
 
         self.speed_control.set_wpm(settings.wpm)
 
-    def _save_window_settings(self):
+    def _save_window_settings(self) -> None:
         """Save window position and size to settings."""
         manager = get_settings_manager()
         settings = manager.settings
@@ -202,7 +202,7 @@ class MainWindow(QMainWindow):
 
         manager.save()
 
-    def _apply_settings(self):
+    def _apply_settings(self) -> None:
         """Apply current settings to UI."""
         settings = get_settings_manager().settings
         self.word_display.update_settings()
@@ -215,7 +215,7 @@ class MainWindow(QMainWindow):
         if self.isVisible():
             self.show()
 
-    def _update_recent_menu(self):
+    def _update_recent_menu(self) -> None:
         """Update the recent files menu."""
         from PyQt6.QtGui import QAction
 
@@ -236,25 +236,25 @@ class MainWindow(QMainWindow):
     # Document loading (delegated)
     # ------------------------------------------------------------------
 
-    def _load_text_dialog(self):
+    def _load_text_dialog(self) -> None:
         """Show the text input dialog."""
         dialog = TextInputDialog(self)
         if dialog.exec():
             self._documents.load_from_text_dialog(dialog.get_text(), dialog.get_source_path())
 
-    def _open_file(self):
+    def _open_file(self) -> None:
         """Open a file directly."""
         self._documents.open_file_dialog()
 
-    def _load_file(self, filepath: str):
+    def _load_file(self, filepath: str) -> None:
         """Load a file by path (used by recent files menu)."""
         self._documents.load_file(filepath)
 
-    def _paste_and_read(self):
+    def _paste_and_read(self) -> None:
         """Paste from clipboard and start reading."""
         self._documents.load_from_clipboard()
 
-    def _on_document_loaded(self, source):
+    def _on_document_loaded(self, source: str | None) -> None:
         """Hook called by DocumentLoader after each successful load."""
         self._current_file = source
         self._update_recent_menu()
@@ -264,14 +264,14 @@ class MainWindow(QMainWindow):
     # Dialogs / view toggles
     # ------------------------------------------------------------------
 
-    def _show_settings(self):
+    def _show_settings(self) -> None:
         """Show the settings dialog."""
         dialog = SettingsDialog(self)
         if dialog.exec():
             self._apply_settings()
             self.speed_control.set_wpm(get_settings_manager().settings.wpm)
 
-    def _toggle_always_on_top(self):
+    def _toggle_always_on_top(self) -> None:
         """Toggle always on top."""
         on_top = self.always_on_top_action.isChecked()
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, on_top)
@@ -281,19 +281,19 @@ class MainWindow(QMainWindow):
         manager.settings.always_on_top = on_top
         manager.save()
 
-    def _toggle_fullscreen(self):
+    def _toggle_fullscreen(self) -> None:
         """Toggle fullscreen mode."""
         if self.isFullScreen():
             self.showNormal()
         else:
             self.showFullScreen()
 
-    def _speed_up(self):
+    def _speed_up(self) -> None:
         """Increase WPM."""
         new_wpm = min(WPM_MAX, self._engine.wpm + WPM_STEP)
         self.speed_control.set_wpm(new_wpm)
 
-    def _speed_down(self):
+    def _speed_down(self) -> None:
         """Decrease WPM."""
         new_wpm = max(WPM_MIN, self._engine.wpm - WPM_STEP)
         self.speed_control.set_wpm(new_wpm)
@@ -302,20 +302,20 @@ class MainWindow(QMainWindow):
     # Bookmarks (delegated)
     # ------------------------------------------------------------------
 
-    def _add_bookmark(self):
+    def _add_bookmark(self) -> None:
         self._bookmarks.add()
 
-    def _remove_bookmark(self):
+    def _remove_bookmark(self) -> None:
         self._bookmarks.remove()
 
-    def _update_bookmarks_menu(self):
+    def _update_bookmarks_menu(self) -> None:
         self._bookmarks.refresh_menu()
 
     # ------------------------------------------------------------------
     # Help dialogs
     # ------------------------------------------------------------------
 
-    def _show_shortcuts(self):
+    def _show_shortcuts(self) -> None:
         """Show keyboard shortcuts help."""
         shortcuts = """
 <h3>Keyboard Shortcuts</h3>
@@ -337,7 +337,7 @@ class MainWindow(QMainWindow):
 """
         QMessageBox.information(self, "Keyboard Shortcuts", shortcuts)
 
-    def _show_about(self):
+    def _show_about(self) -> None:
         """Show about dialog."""
         from rsvp import __version__
 
@@ -355,26 +355,26 @@ class MainWindow(QMainWindow):
     # Signal handlers
     # ------------------------------------------------------------------
 
-    def _on_word_changed(self, word):
+    def _on_word_changed(self, word) -> None:
         """Handle word changed signal."""
         self.word_display.set_word(word)
 
-    def _on_state_changed(self):
+    def _on_state_changed(self) -> None:
         """Handle state changed signal."""
         self.playback_controls.set_playing(self._engine.is_playing)
 
-    def _on_progress_changed(self, progress: float):
+    def _on_progress_changed(self, progress: float) -> None:
         """Handle progress changed signal."""
         state = self._engine.state
         self.progress_widget.update_progress(
             progress, state.current_index, len(state.words), state.time_remaining_seconds
         )
 
-    def _on_wpm_changed(self, wpm):
+    def _on_wpm_changed(self, wpm) -> None:
         """Handle WPM changed signal."""
         self._engine.wpm = wpm
 
-    def _on_finished(self):
+    def _on_finished(self) -> None:
         """Handle finished signal."""
         self.status_label.setText("Finished reading")
         if self._current_file:
@@ -385,7 +385,7 @@ class MainWindow(QMainWindow):
     # Notifications / lifecycle
     # ------------------------------------------------------------------
 
-    def _check_settings_reset(self):
+    def _check_settings_reset(self) -> None:
         """Show notification if settings were reset due to corruption."""
         if get_settings_manager().was_reset():
             QMessageBox.warning(
@@ -395,12 +395,12 @@ class MainWindow(QMainWindow):
                 "A backup was saved to settings.json.bak.",
             )
 
-    def _check_settings_save_failed(self):
+    def _check_settings_save_failed(self) -> None:
         """Show notification if settings could not be saved (e.g. read-only filesystem)."""
         if get_settings_manager().save_failed():
             self.status_label.setText("Warning: settings could not be saved (filesystem error)")
 
-    def closeEvent(self, event):
+    def closeEvent(self, event) -> None:
         """Handle window close."""
         self._documents.maybe_save_position()
         self._save_window_settings()

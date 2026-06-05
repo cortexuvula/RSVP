@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class TextInputDialog(QDialog):
     """Dialog for inputting text via paste, file, or URL."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Load Text")
         self.setMinimumSize(600, 400)
@@ -36,7 +36,7 @@ class TextInputDialog(QDialog):
         self._url_text_truncated = False
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
 
         # Tab widget
@@ -126,7 +126,7 @@ class TextInputDialog(QDialog):
 
         layout.addLayout(btn_layout)
 
-    def _paste_from_clipboard(self):
+    def _paste_from_clipboard(self) -> None:
         """Paste text from clipboard."""
         try:
             import pyperclip
@@ -144,7 +144,7 @@ class TextInputDialog(QDialog):
             clipboard = QApplication.clipboard()
             self.text_edit.setPlainText(clipboard.text())
 
-    def _browse_file(self):
+    def _browse_file(self) -> None:
         """Open file browser."""
         filepath, _ = QFileDialog.getOpenFileName(
             self,
@@ -170,7 +170,7 @@ class TextInputDialog(QDialog):
                 logger.exception("Failed to load file: %s", filepath)
                 QMessageBox.warning(self, "Error", f"Failed to load file: {e}")
 
-    def _fetch_url(self):
+    def _fetch_url(self) -> None:
         """Fetch text from URL."""
         url = self.url_edit.text().strip()
         if not url:
@@ -193,7 +193,7 @@ class TextInputDialog(QDialog):
         finally:
             QApplication.restoreOverrideCursor()
 
-    def _accept(self):
+    def _accept(self) -> None:
         """Accept the dialog and set the text."""
         current_tab = self.tabs.currentIndex()
 
