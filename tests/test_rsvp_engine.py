@@ -599,8 +599,19 @@ class TestRSVPEngineSentenceNavigation:
 class TestRSVPEngineParagraphPause:
     """Tests for paragraph pause in timer interval."""
 
+    @staticmethod
+    def _isolated_manager(pause_at_paragraphs: bool = True):
+        from rsvp.core.settings import RSVPSettings, SettingsManager
+
+        manager = SettingsManager.__new__(SettingsManager)
+        manager._settings = RSVPSettings(pause_at_paragraphs=pause_at_paragraphs)
+        manager._settings_were_reset = False
+        manager._save_failed = False
+        manager._config_path = None  # type: ignore[assignment]
+        return manager
+
     def test_paragraph_break_multiplies_interval(self, qapp):
-        engine = RSVPEngine()
+        engine = RSVPEngine(settings=self._isolated_manager(pause_at_paragraphs=True))
         engine.load_text("End.\n\nStart")
         assert engine.state.words[0].paragraph_break_after is True
         engine._state.wpm = 300
@@ -609,23 +620,15 @@ class TestRSVPEngineParagraphPause:
         assert engine._timer.interval() == 1500
 
     def test_no_paragraph_break_no_extra_pause(self, qapp):
-        engine = RSVPEngine()
+        engine = RSVPEngine(settings=self._isolated_manager(pause_at_paragraphs=True))
         engine.load_text("Hello world")
         engine._state.wpm = 300
         engine._update_timer_interval()
         assert engine._timer.interval() == 200
 
     def test_paragraph_pause_disabled_in_settings(self, qapp):
-        from rsvp.core.settings import get_settings_manager
-
-        manager = get_settings_manager()
-        original = manager.settings.pause_at_paragraphs
-        try:
-            manager.settings.pause_at_paragraphs = False
-            engine = RSVPEngine()
-            engine.load_text("End.\n\nStart")
-            engine._state.wpm = 300
-            engine._update_timer_interval()
-            assert engine._timer.interval() == 500
-        finally:
-            manager.settings.pause_at_paragraphs = original
+        engine = RSVPEngine(settings=self._isolated_manager(pause_at_paragraphs=False))
+        engine.load_text("End.\n\nStart")
+        engine._state.wpm = 300
+        engine._update_timer_interval()
+        assert engine._timer.interval() == 500

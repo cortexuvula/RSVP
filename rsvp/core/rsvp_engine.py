@@ -11,7 +11,7 @@ from rsvp.core.constants import (
     WPM_MAX,
     WPM_MIN,
 )
-from rsvp.core.settings import get_settings_manager
+from rsvp.core.settings import SettingsManager
 from rsvp.core.text_processor import Word, process_text
 
 
@@ -63,8 +63,9 @@ class RSVPEngine(QObject):
     progress_changed = pyqtSignal(float)  # Emits progress percentage
     finished = pyqtSignal()  # Emits when reaching end of text
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, settings: SettingsManager | None = None):
         super().__init__(parent)
+        self._settings = settings
         self._state = RSVPState()
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._advance)
@@ -229,7 +230,7 @@ class RSVPEngine(QObject):
         current = self._state.current_word
         if current:
             interval = base_interval * current.pause_after
-            if current.paragraph_break_after and get_settings_manager().settings.pause_at_paragraphs:
+            if current.paragraph_break_after and self._settings is not None and self._settings.settings.pause_at_paragraphs:
                 interval *= PAUSE_PARAGRAPH
         else:
             interval = base_interval
