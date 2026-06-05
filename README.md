@@ -49,6 +49,8 @@ ruff check .
 ruff format .
 ```
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full development setup, code style, and PR process.
+
 ## Usage
 
 ### Running the Application
