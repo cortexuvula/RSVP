@@ -263,6 +263,29 @@ class TestLoadTextFromFile:
         with pytest.raises(FileNotFoundError):
             load_text_from_file("/nonexistent/path/file.txt")
 
+    def test_dispatches_markdown(self, tmp_path):
+        p = tmp_path / "doc.md"
+        p.write_text("# Header\n\n**bold** text", encoding="utf-8")
+        result = load_text_from_file(str(p))
+        assert "Header" in result
+        assert "bold" in result
+        assert "#" not in result
+
+    def test_dispatches_html(self, tmp_path):
+        p = tmp_path / "doc.html"
+        p.write_text("<h1>Title</h1><p>Body &amp; more</p>", encoding="utf-8")
+        result = load_text_from_file(str(p))
+        assert "Title" in result
+        assert "Body & more" in result
+        assert "<h1>" not in result
+
+    def test_htm_extension_treated_as_html(self, tmp_path):
+        p = tmp_path / "doc.htm"
+        p.write_text("<p>html</p>", encoding="utf-8")
+        result = load_text_from_file(str(p))
+        assert "html" in result
+        assert "<p>" not in result
+
 
 class TestParagraphBreakDetection:
     """Tests for paragraph break detection in process_text."""
