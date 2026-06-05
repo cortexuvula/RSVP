@@ -1,5 +1,6 @@
 """Settings dialog."""
 
+import logging
 from dataclasses import asdict
 
 from PyQt6.QtGui import QColor, QFont
@@ -18,6 +19,8 @@ from PyQt6.QtWidgets import (
 
 from rsvp.core.constants import FONT_SIZE_MAX, FONT_SIZE_MIN, WPM_MAX, WPM_MIN
 from rsvp.core.settings import get_settings_manager
+
+logger = logging.getLogger(__name__)
 
 
 class ColorButton(QPushButton):
@@ -159,6 +162,7 @@ class SettingsDialog(QDialog):
         settings.auto_save_position = self.auto_save_check.isChecked()
 
         manager.save()
+        logger.info("Settings applied")
 
     def _save_and_accept(self):
         """Save settings and close."""

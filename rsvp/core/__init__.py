@@ -34,6 +34,10 @@ from rsvp.core.text_processor import (
     strip_markdown,
 )
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 __all__ = [
     "ALLOWED_URL_SCHEMES",
     "DEFAULT_SKIP_WORDS",
