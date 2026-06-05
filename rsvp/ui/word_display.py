@@ -44,61 +44,61 @@ class ORPWordDisplay(QWidget):
         self._font.setPointSize(size)
         self.update()
 
-    def paintEvent(self, event):
+    def paintEvent(self, event) -> None:
         """Paint the word with ORP highlighting."""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        try:
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Fill background
-        painter.fillRect(self.rect(), self._bg_color)
+            # Fill background
+            painter.fillRect(self.rect(), self._bg_color)
 
-        if not self._word:
+            if not self._word:
+                return
+
+            painter.setFont(self._font)
+            fm = QFontMetrics(self._font)
+
+            # Calculate text dimensions
+            before = self._word.before_orp
+            orp_char = self._word.orp_char
+            after = self._word.after_orp
+
+            # Calculate widths
+            before_width = fm.horizontalAdvance(before)
+            orp_width = fm.horizontalAdvance(orp_char)
+
+            # Calculate positions - center the ORP character
+            center_x = self.width() // 2
+            center_y = self.height() // 2
+
+            # Draw ORP indicator line (vertical red line at center)
+            indicator_height = fm.height() + 20
+            painter.setPen(self._orp_color)
+            painter.drawLine(
+                center_x, center_y - indicator_height // 2, center_x, center_y + indicator_height // 2
+            )
+
+            # Position text so ORP char is centered
+            text_y = center_y + fm.ascent() // 2
+
+            # Calculate x position so ORP character is centered
+            orp_center = before_width + orp_width // 2
+            text_x = center_x - orp_center
+
+            # Draw before ORP
+            painter.setPen(self._text_color)
+            painter.drawText(int(text_x), int(text_y), before)
+
+            # Draw ORP character in highlight color
+            painter.setPen(self._orp_color)
+            painter.drawText(int(text_x + before_width), int(text_y), orp_char)
+
+            # Draw after ORP
+            painter.setPen(self._text_color)
+            painter.drawText(int(text_x + before_width + orp_width), int(text_y), after)
+        finally:
             painter.end()
-            return
-
-        painter.setFont(self._font)
-        fm = QFontMetrics(self._font)
-
-        # Calculate text dimensions
-        before = self._word.before_orp
-        orp_char = self._word.orp_char
-        after = self._word.after_orp
-
-        # Calculate widths
-        before_width = fm.horizontalAdvance(before)
-        orp_width = fm.horizontalAdvance(orp_char)
-
-        # Calculate positions - center the ORP character
-        center_x = self.width() // 2
-        center_y = self.height() // 2
-
-        # Draw ORP indicator line (vertical red line at center)
-        indicator_height = fm.height() + 20
-        painter.setPen(self._orp_color)
-        painter.drawLine(
-            center_x, center_y - indicator_height // 2, center_x, center_y + indicator_height // 2
-        )
-
-        # Position text so ORP char is centered
-        text_y = center_y + fm.ascent() // 2
-
-        # Calculate x position so ORP character is centered
-        orp_center = before_width + orp_width // 2
-        text_x = center_x - orp_center
-
-        # Draw before ORP
-        painter.setPen(self._text_color)
-        painter.drawText(int(text_x), int(text_y), before)
-
-        # Draw ORP character in highlight color
-        painter.setPen(self._orp_color)
-        painter.drawText(int(text_x + before_width), int(text_y), orp_char)
-
-        # Draw after ORP
-        painter.setPen(self._text_color)
-        painter.drawText(int(text_x + before_width + orp_width), int(text_y), after)
-
-        painter.end()
 
 
 class WordDisplayWidget(QWidget):
