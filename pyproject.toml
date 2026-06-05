@@ -74,3 +74,19 @@ ignore = [
 "tests/*" = ["B011"]  # asserts inside tests are fine
 "rsvp/core/__init__.py" = ["F401"]  # re-exports
 "rsvp/ui/__init__.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["rsvp"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+no_implicit_optional = true
+ignore_missing_imports = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+# PyQt6 stubs return QMenuBar | None / QMenu | None for some methods that
+# never actually return None at runtime; suppress the spurious union-attr
+# errors that result. Real type errors still surface.
+disable_error_code = ["union-attr"]

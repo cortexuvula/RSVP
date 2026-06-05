@@ -25,7 +25,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
-        self._current_file = None
+        self._current_file: str | None = None
         self._engine = RSVPEngine()
         self._setup_ui()
         self._setup_menus()

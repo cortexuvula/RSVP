@@ -31,9 +31,9 @@ class TextInputDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Load Text")
         self.setMinimumSize(600, 400)
-        self._text = ""
-        self._source_path = None
-        self._url_text_truncated = False
+        self._text: str = ""
+        self._source_path: str | None = None
+        self._url_text_truncated: bool = False
         self._setup_ui()
 
     def _setup_ui(self) -> None:
