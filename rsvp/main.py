@@ -40,7 +40,7 @@ def _resolve_icon_path() -> Path | None:
     return None
 
 
-def main():
+def main() -> None:
     """Run the RSVP application."""
     _configure_logging()
     app = QApplication(sys.argv)

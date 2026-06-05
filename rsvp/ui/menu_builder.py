@@ -22,7 +22,7 @@ class MenuBuilder:
     (e.g. ``_load_text_dialog``, ``_add_bookmark``).
     """
 
-    def __init__(self, window: QMainWindow, host):
+    def __init__(self, window: QMainWindow, host) -> None:
         self._window = window
         self._host = host
 

@@ -27,12 +27,12 @@ class PlaybackControls(QWidget):
     prev_sentence_clicked = pyqtSignal()
     next_sentence_clicked = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._is_playing = False
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 5, 10, 5)
 
@@ -92,7 +92,7 @@ class PlaybackControls(QWidget):
         self.next_sentence_btn.clicked.connect(self.next_sentence_clicked.emit)
         layout.addWidget(self.next_sentence_btn)
 
-    def _on_play_pause(self):
+    def _on_play_pause(self) -> None:
         if self._is_playing:
             self.pause_clicked.emit()
         else:
@@ -162,27 +162,27 @@ class SpeedControl(QWidget):
 
         self.slider.setStyleSheet("QSlider:focus { border: 1px solid #4A9EFF; }")
 
-    def _decrease_wpm(self):
+    def _decrease_wpm(self) -> None:
         new_val = max(WPM_MIN, self.spinbox.value() - WPM_STEP)
         self.set_wpm(new_val)
 
-    def _increase_wpm(self):
+    def _increase_wpm(self) -> None:
         new_val = min(WPM_MAX, self.spinbox.value() + WPM_STEP)
         self.set_wpm(new_val)
 
-    def _on_slider_change(self, value):
+    def _on_slider_change(self, value: int) -> None:
         self.spinbox.blockSignals(True)
         self.spinbox.setValue(value)
         self.spinbox.blockSignals(False)
         self.wpm_changed.emit(value)
 
-    def _on_spinbox_change(self, value):
+    def _on_spinbox_change(self, value: int) -> None:
         self.slider.blockSignals(True)
         self.slider.setValue(min(value, WPM_SLIDER_MAX))
         self.slider.blockSignals(False)
         self.wpm_changed.emit(value)
 
-    def set_wpm(self, wpm: int):
+    def set_wpm(self, wpm: int) -> None:
         """Set the WPM value."""
         self.spinbox.blockSignals(True)
         self.slider.blockSignals(True)
@@ -229,7 +229,7 @@ class ProgressWidget(QWidget):
         self.time_label.setMinimumWidth(80)
         layout.addWidget(self.time_label)
 
-    def _on_seek(self):
+    def _on_seek(self) -> None:
         percent = (self.slider.value() / 1000) * 100
         self.seek_requested.emit(percent)
 

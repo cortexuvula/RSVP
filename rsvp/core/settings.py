@@ -49,7 +49,7 @@ class RSVPSettings:
 class SettingsManager:
     """Manager for loading and saving settings."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._settings = RSVPSettings()
         self._settings_were_reset = False
         self._save_failed = False
@@ -76,7 +76,7 @@ class SettingsManager:
         """Get current settings."""
         return self._settings
 
-    def load(self):
+    def load(self) -> None:
         """Load settings from file."""
         if self._config_path.exists():
             try:
@@ -110,7 +110,7 @@ class SettingsManager:
         self._save_failed = False
         return result
 
-    def save(self):
+    def save(self) -> None:
         """Save settings to file. Logs a warning and sets save_failed flag on IOError."""
         try:
             with open(self._config_path, "w", encoding="utf-8") as f:
@@ -119,7 +119,7 @@ class SettingsManager:
             self._save_failed = True
             logger.warning("Failed to save settings to %s: %s", self._config_path, e)
 
-    def add_recent_file(self, filepath: str):
+    def add_recent_file(self, filepath: str) -> None:
         """Add a file to the recent files list."""
         if filepath in self._settings.recent_files:
             self._settings.recent_files.remove(filepath)
@@ -130,7 +130,7 @@ class SettingsManager:
 
         self.save()
 
-    def add_bookmark(self, filepath: str, word_index: int):
+    def add_bookmark(self, filepath: str, word_index: int) -> None:
         """Add a bookmark for a file."""
         if filepath not in self._settings.bookmarks:
             self._settings.bookmarks[filepath] = []
@@ -140,7 +140,7 @@ class SettingsManager:
             self._settings.bookmarks[filepath].sort()
             self.save()
 
-    def remove_bookmark(self, filepath: str, word_index: int):
+    def remove_bookmark(self, filepath: str, word_index: int) -> None:
         """Remove a bookmark."""
         if filepath in self._settings.bookmarks:
             if word_index in self._settings.bookmarks[filepath]:
@@ -151,7 +151,7 @@ class SettingsManager:
         """Get bookmarks for a file."""
         return self._settings.bookmarks.get(filepath, [])
 
-    def save_position(self, source: str, index: int):
+    def save_position(self, source: str, index: int) -> None:
         """Save reading position for a source."""
         self._settings.saved_positions[source] = index
         self.save()
@@ -160,7 +160,7 @@ class SettingsManager:
         """Get saved reading position for a source."""
         return self._settings.saved_positions.get(source)
 
-    def clear_position(self, source: str):
+    def clear_position(self, source: str) -> None:
         """Clear saved reading position for a source."""
         self._settings.saved_positions.pop(source, None)
         self.save()
