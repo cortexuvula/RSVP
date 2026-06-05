@@ -26,7 +26,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
-        self._current_file = None
+        self._current_file: str | None = None
         self._engine = RSVPEngine()
         self._tts = TTSController(self._engine, driver=create_tts_driver())
         self._tts.set_enabled(get_settings_manager().settings.tts_enabled)
