@@ -41,6 +41,10 @@ from rsvp.core.tts import (
     create_tts_driver,
 )
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 __all__ = [
     "ALLOWED_URL_SCHEMES",
     "DEFAULT_SKIP_WORDS",

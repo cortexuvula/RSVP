@@ -1,5 +1,7 @@
 """Playback control widgets."""
 
+import logging
+
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QSlider, QSpinBox, QStyle, QWidget
 
@@ -10,6 +12,8 @@ from rsvp.core.constants import (
     WPM_SLIDER_MAX,
     WPM_STEP,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class PlaybackControls(QWidget):
@@ -187,6 +191,7 @@ class SpeedControl(QWidget):
         self.spinbox.blockSignals(False)
         self.slider.blockSignals(False)
         self.wpm_changed.emit(wpm)
+        logger.debug("WPM set to %d", wpm)
 
     def get_wpm(self) -> int:
         """Get the current WPM value."""

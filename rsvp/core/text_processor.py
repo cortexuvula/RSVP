@@ -1,5 +1,6 @@
 """Text processing utilities for RSVP."""
 
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +13,8 @@ from rsvp.core.constants import (
     PAUSE_TRAILING_PUNCTUATION,
     URL_FETCH_TIMEOUT_SECONDS,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -189,6 +192,7 @@ def extract_text_from_html(html: str) -> str:
 def load_text_from_file(filepath: str) -> str:
     """Load text from a file, dispatching by extension."""
     ext = Path(filepath).suffix.lower()
+    logger.debug("load_text_from_file dispatch for extension %s", ext or "(none)")
 
     if ext == ".md":
         with open(filepath, encoding="utf-8") as f:

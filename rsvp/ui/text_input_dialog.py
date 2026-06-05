@@ -1,5 +1,7 @@
 """Dialog for text input."""
 
+import logging
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog,
@@ -17,6 +19,8 @@ from PyQt6.QtWidgets import (
 
 from rsvp.core.constants import PREVIEW_MAX_CHARS
 from rsvp.core.text_processor import fetch_text_from_url, load_text_from_file
+
+logger = logging.getLogger(__name__)
 
 
 class TextInputDialog(QDialog):
@@ -129,6 +133,7 @@ class TextInputDialog(QDialog):
             text = pyperclip.paste()
             if text:
                 self.text_edit.setPlainText(text)
+                logger.debug("Pasted %d chars from clipboard via pyperclip", len(text))
         except Exception:
             # Fallback to Qt clipboard
             from PyQt6.QtWidgets import QApplication
@@ -177,6 +182,7 @@ class TextInputDialog(QDialog):
                 text[:PREVIEW_MAX_CHARS] + ("..." if self._url_text_truncated else "")
             )
             self._source_path = url
+            logger.info("Fetched URL %s (%d chars)", url, len(text))
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to fetch URL: {e}")
         finally:

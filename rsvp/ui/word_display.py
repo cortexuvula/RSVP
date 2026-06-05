@@ -1,10 +1,14 @@
 """Word display widget with ORP highlighting."""
 
+import logging
+
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from rsvp.core.settings import get_settings_manager
 from rsvp.core.text_processor import Word
+
+logger = logging.getLogger(__name__)
 
 
 class ORPWordDisplay(QWidget):

@@ -11,8 +11,10 @@ from PyQt6.QtWidgets import QApplication
 from rsvp import __version__
 from rsvp.ui.main_window import MainWindow
 
+logger = logging.getLogger(__name__)
 
-def _configure_logging():
+
+def _configure_logging() -> None:
     """Configure logging for the application."""
     level_name = os.environ.get("RSVP_LOG_LEVEL", "WARNING").upper()
     level = getattr(logging, level_name, logging.WARNING)
@@ -21,6 +23,7 @@ def _configure_logging():
         format="%(asctime)s %(name)s %(levelname)s: %(message)s",
         stream=sys.stderr,
     )
+    logging.getLogger("rsvp").setLevel(level)
 
 
 def _resolve_icon_path() -> Path | None:
@@ -44,6 +47,7 @@ def main():
     app.setApplicationName("RSVP Reader")
     app.setApplicationVersion(__version__)
     app.setOrganizationName("RSVP")
+    logger.info("RSVP Reader starting (version %s)", __version__)
 
     icon_path = _resolve_icon_path()
     if icon_path is not None:

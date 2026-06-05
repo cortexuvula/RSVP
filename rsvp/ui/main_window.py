@@ -1,5 +1,7 @@
 """Main application window."""
 
+import logging
+
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStatusBar, QVBoxLayout, QWidget
@@ -15,6 +17,8 @@ from rsvp.ui.menu_builder import MenuBuilder
 from rsvp.ui.settings_dialog import SettingsDialog
 from rsvp.ui.text_input_dialog import TextInputDialog
 from rsvp.ui.word_display import WordDisplayWidget
+
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
@@ -35,6 +39,7 @@ class MainWindow(QMainWindow):
         self.installEventFilter(self)
         self._setup_tab_order()
         self._check_settings_reset()
+        logger.info("MainWindow initialized")
 
     # ------------------------------------------------------------------
     # Accessors used by MenuBuilder
@@ -378,6 +383,7 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Finished reading")
         if self._current_file:
             get_settings_manager().clear_position(self._current_file)
+            logger.info("Reading finished; cleared saved position for %s", self._current_file)
 
     # ------------------------------------------------------------------
     # Notifications / lifecycle

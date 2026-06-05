@@ -1,5 +1,6 @@
 """RSVP playback engine."""
 
+import logging
 from dataclasses import dataclass, field
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
@@ -13,6 +14,8 @@ from rsvp.core.constants import (
 )
 from rsvp.core.settings import get_settings_manager
 from rsvp.core.text_processor import Word, process_text
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -108,6 +111,7 @@ class RSVPEngine(QObject):
         self._state.current_index = 0
         self.state_changed.emit()
         self.progress_changed.emit(0.0)
+        logger.info("Loaded %d words into engine", len(self._state.words))
         if self._state.words:
             self.word_changed.emit(self._state.current_word)
         else:
@@ -125,12 +129,14 @@ class RSVPEngine(QObject):
         self._state.is_playing = True
         self._update_timer_interval()
         self._timer.start()
+        logger.debug("Engine play() at index %d", self._state.current_index)
         self.state_changed.emit()
 
     def pause(self):
         """Pause playback."""
         self._state.is_playing = False
         self._timer.stop()
+        logger.debug("Engine pause() at index %d", self._state.current_index)
         self.state_changed.emit()
 
     def toggle_play_pause(self):
@@ -156,6 +162,7 @@ class RSVPEngine(QObject):
             return
 
         self._state.current_index = max(0, min(index, len(self._state.words) - 1))
+        logger.debug("Engine seek() to index %d", self._state.current_index)
         self.word_changed.emit(self._state.current_word)
         self.progress_changed.emit(self._state.progress)
 
