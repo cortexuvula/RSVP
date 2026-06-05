@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStat
 
 from rsvp.core.constants import WPM_MAX, WPM_MIN, WPM_STEP
 from rsvp.core.rsvp_engine import RSVPEngine
-from rsvp.core.settings import get_settings_manager
+from rsvp.core.settings import SettingsManager
 from rsvp.core.tts import TTSController, create_tts_driver
 from rsvp.ui.bookmark_controller import BookmarkController
 from rsvp.ui.controls import PlaybackControls, ProgressWidget, SpeedControl
@@ -22,14 +22,15 @@ logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
-    """Main application window."""
+    """Main application window.
 
-    def __init__(self) -> None:
+    def __init__(self, settings: SettingsManager | None = None) -> None:
         super().__init__()
+        self._settings = settings if settings is not None else SettingsManager()
         self._current_file: str | None = None
-        self._engine = RSVPEngine()
+        self._engine = RSVPEngine(settings=self._settings)
         self._tts = TTSController(self._engine, driver=create_tts_driver())
-        self._tts.set_enabled(get_settings_manager().settings.tts_enabled)
+        self._tts.set_enabled(self._settings.settings.tts_enabled)
         self._setup_ui()
         self._setup_menus()
         self._setup_controllers()
@@ -65,7 +66,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self.word_display = WordDisplayWidget()
+        self.word_display = WordDisplayWidget(settings=self._settings)
         layout.addWidget(self.word_display, stretch=1)
 
         controls_panel = QWidget()
@@ -110,6 +111,7 @@ class MainWindow(QMainWindow):
             submenu=self.bookmarks_submenu,
             status_setter=self.status_label.setText,
             current_file_getter=lambda: self._current_file,
+            settings=self._settings,
         )
         self._documents = DocumentLoader(
             parent_widget=self,
@@ -118,6 +120,7 @@ class MainWindow(QMainWindow):
             title_setter=self.setWindowTitle,
             on_loaded=self._on_document_loaded,
             current_file_getter=lambda: self._current_file,
+            settings=self._settings,
         )
         self._bookmarks.refresh_menu()
 
@@ -180,7 +183,7 @@ class MainWindow(QMainWindow):
 
     def _load_window_settings(self) -> None:
         """Load window position and size from settings."""
-        settings = get_settings_manager().settings
+        settings = self._settings.settings
 
         self.resize(settings.window_width, settings.window_height)
 
@@ -195,19 +198,18 @@ class MainWindow(QMainWindow):
 
     def _save_window_settings(self) -> None:
         """Save window position and size to settings."""
-        manager = get_settings_manager()
-        settings = manager.settings
+        settings = self._settings.settings
 
         settings.window_width = self.width()
         settings.window_height = self.height()
         settings.window_x = self.x()
         settings.window_y = self.y()
 
-        manager.save()
+        self._settings.save()
 
     def _apply_settings(self) -> None:
         """Apply current settings to UI."""
-        settings = get_settings_manager().settings
+        settings = self._settings.settings
         self.word_display.update_settings()
         self._tts.set_enabled(settings.tts_enabled)
 
@@ -224,7 +226,7 @@ class MainWindow(QMainWindow):
         from PyQt6.QtGui import QAction
 
         self.recent_menu.clear()
-        settings = get_settings_manager().settings
+        settings = self._settings.settings
 
         for filepath in settings.recent_files:
             action = QAction(filepath, self)
@@ -270,10 +272,10 @@ class MainWindow(QMainWindow):
 
     def _show_settings(self) -> None:
         """Show the settings dialog."""
-        dialog = SettingsDialog(self)
+        dialog = SettingsDialog(self, settings=self._settings)
         if dialog.exec():
             self._apply_settings()
-            self.speed_control.set_wpm(get_settings_manager().settings.wpm)
+            self.speed_control.set_wpm(self._settings.settings.wpm)
 
     def _toggle_always_on_top(self) -> None:
         """Toggle always on top."""
@@ -281,9 +283,8 @@ class MainWindow(QMainWindow):
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, on_top)
         self.show()
 
-        manager = get_settings_manager()
-        manager.settings.always_on_top = on_top
-        manager.save()
+        self._settings.settings.always_on_top = on_top
+        self._settings.save()
 
     def _toggle_fullscreen(self) -> None:
         """Toggle fullscreen mode."""
@@ -382,7 +383,7 @@ class MainWindow(QMainWindow):
         """Handle finished signal."""
         self.status_label.setText("Finished reading")
         if self._current_file:
-            get_settings_manager().clear_position(self._current_file)
+            self._settings.clear_position(self._current_file)
             logger.info("Reading finished; cleared saved position for %s", self._current_file)
 
     # ------------------------------------------------------------------
@@ -391,7 +392,7 @@ class MainWindow(QMainWindow):
 
     def _check_settings_reset(self) -> None:
         """Show notification if settings were reset due to corruption."""
-        if get_settings_manager().was_reset():
+        if self._settings.was_reset():
             QMessageBox.warning(
                 self,
                 "Settings Reset",
@@ -401,7 +402,7 @@ class MainWindow(QMainWindow):
 
     def _check_settings_save_failed(self) -> None:
         """Show notification if settings could not be saved (e.g. read-only filesystem)."""
-        if get_settings_manager().save_failed():
+        if self._settings.save_failed():
             self.status_label.setText("Warning: settings could not be saved (filesystem error)")
 
     def closeEvent(self, event) -> None:

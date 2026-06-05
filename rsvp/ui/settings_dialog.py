@@ -18,7 +18,9 @@ from PyQt6.QtWidgets import (
 )
 
 from rsvp.core.constants import FONT_SIZE_MAX, FONT_SIZE_MIN, WPM_MAX, WPM_MIN
-from rsvp.core.settings import get_settings_manager
+from rsvp.core.settings import SettingsManager
+
+logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
 
@@ -57,14 +59,16 @@ class ColorButton(QPushButton):
 class SettingsDialog(QDialog):
     """Dialog for application settings."""
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, settings: SettingsManager | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(450)
+        self._settings = settings
         self._setup_ui()
         self._load_settings()
         # Snapshot for rollback if user clicks Apply then Cancel
-        self._original_settings = asdict(get_settings_manager().settings)
+        if self._settings is not None:
+            self._original_settings = asdict(self._settings.settings)
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -137,7 +141,9 @@ class SettingsDialog(QDialog):
 
     def _load_settings(self) -> None:
         """Load current settings into the dialog."""
-        settings = get_settings_manager().settings
+        if self._settings is None:
+            return
+        settings = self._settings.settings
 
         self.font_combo.setCurrentFont(QFont(settings.font_family))
         self.font_size_spin.setValue(settings.font_size)
@@ -152,8 +158,9 @@ class SettingsDialog(QDialog):
 
     def _apply(self) -> None:
         """Apply settings without closing."""
-        manager = get_settings_manager()
-        settings = manager.settings
+        if self._settings is None:
+            return
+        settings = self._settings.settings
 
         settings.font_family = self.font_combo.currentFont().family()
         settings.font_size = self.font_size_spin.value()
@@ -166,7 +173,7 @@ class SettingsDialog(QDialog):
         settings.auto_save_position = self.auto_save_check.isChecked()
         settings.tts_enabled = self.tts_check.isChecked()
 
-        manager.save()
+        self._settings.save()
         logger.info("Settings applied")
 
     def _save_and_accept(self) -> None:
@@ -176,9 +183,11 @@ class SettingsDialog(QDialog):
 
     def reject(self) -> None:
         """Restore original settings on cancel (undoes any Apply clicks)."""
-        manager = get_settings_manager()
+        if self._settings is None:
+            super().reject()
+            return
         for key, value in self._original_settings.items():
-            if hasattr(manager.settings, key):
-                setattr(manager.settings, key, value)
-        manager.save()
+            if hasattr(self._settings.settings, key):
+                setattr(self._settings.settings, key, value)
+        self._settings.save()
         super().reject()

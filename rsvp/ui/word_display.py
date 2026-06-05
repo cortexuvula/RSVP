@@ -5,7 +5,7 @@ import logging
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
-from rsvp.core.settings import get_settings_manager
+from rsvp.core.settings import SettingsManager
 from rsvp.core.text_processor import Word
 
 logger = logging.getLogger(__name__)
@@ -14,9 +14,10 @@ logger = logging.getLogger(__name__)
 class ORPWordDisplay(QWidget):
     """Widget that displays a word with ORP (Optimal Recognition Point) highlighting."""
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, settings: SettingsManager | None = None) -> None:
         super().__init__(parent)
         self._word: Word | None = None
+        self._settings = settings
         self._font = QFont("Arial", 48)
         self._text_color = QColor("#FFFFFF")
         self._orp_color = QColor("#FF6B6B")
@@ -27,7 +28,9 @@ class ORPWordDisplay(QWidget):
 
     def _load_settings(self) -> None:
         """Load display settings."""
-        settings = get_settings_manager().settings
+        if self._settings is None:
+            return
+        settings = self._settings.settings
         self._font = QFont(settings.font_family, settings.font_size)
         self._text_color = QColor(settings.text_color)
         self._orp_color = QColor(settings.orp_color)
@@ -108,8 +111,9 @@ class ORPWordDisplay(QWidget):
 class WordDisplayWidget(QWidget):
     """Complete word display widget with surrounding context."""
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, settings: SettingsManager | None = None) -> None:
         super().__init__(parent)
+        self._settings = settings
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -117,7 +121,7 @@ class WordDisplayWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         # Main word display
-        self.word_display = ORPWordDisplay()
+        self.word_display = ORPWordDisplay(settings=self._settings)
         layout.addWidget(self.word_display)
 
         self.setLayout(layout)

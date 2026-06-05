@@ -11,7 +11,7 @@ from collections.abc import Callable
 from PyQt6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
 from rsvp.core.rsvp_engine import RSVPEngine
-from rsvp.core.settings import get_settings_manager
+from rsvp.core.settings import SettingsManager
 from rsvp.core.text_processor import load_text_from_file
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,7 @@ class DocumentLoader:
         title_setter: Callable[[str], None],
         on_loaded: Callable[[str | None], None],
         current_file_getter: Callable[[], str | None],
+        settings: SettingsManager | None = None,
     ) -> None:
         self._parent = parent_widget
         self._engine = engine
@@ -45,6 +46,7 @@ class DocumentLoader:
         self._set_title = title_setter
         self._on_loaded = on_loaded
         self._get_current_file = current_file_getter
+        self._settings = settings
 
     def open_file_dialog(self) -> str | None:
         """Show the open-file dialog and load the chosen file. Returns the path or None."""
@@ -70,7 +72,8 @@ class DocumentLoader:
             return False
 
         self._engine.load_text(text)
-        get_settings_manager().add_recent_file(filepath)
+        if self._settings is not None:
+            self._settings.add_recent_file(filepath)
         self._set_title(f"RSVP Reader - {filepath}")
         self._set_status(f"Loaded {self._engine.word_count} words")
         logger.info("Loaded file %s (%d words)", filepath, self._engine.word_count)
@@ -84,7 +87,8 @@ class DocumentLoader:
         self._engine.load_text(text)
 
         if source:
-            get_settings_manager().add_recent_file(source)
+            if self._settings is not None:
+                self._settings.add_recent_file(source)
             self._set_title(f"RSVP Reader - {source}")
         else:
             self._set_title("RSVP Reader")
@@ -125,21 +129,21 @@ class DocumentLoader:
         self._maybe_save_position()
 
     def _maybe_save_position(self) -> None:
-        manager = get_settings_manager()
-        if not manager.settings.auto_save_position:
+        if self._settings is None:
+            return
+        if not self._settings.settings.auto_save_position:
             return
         current_file = self._get_current_file()
         if current_file and self._engine.current_index > 0:
-            manager.save_position(current_file, self._engine.current_index)
+            self._settings.save_position(current_file, self._engine.current_index)
 
     def _maybe_resume_position(self, source: str | None) -> None:
-        if not source:
+        if not source or self._settings is None:
             return
-        manager = get_settings_manager()
-        if not manager.settings.auto_save_position:
+        if not self._settings.settings.auto_save_position:
             return
 
-        saved_index = manager.get_position(source)
+        saved_index = self._settings.get_position(source)
         if saved_index is None or saved_index <= 0:
             return
         if saved_index >= self._engine.word_count:

@@ -164,14 +164,3 @@ class SettingsManager:
         """Clear saved reading position for a source."""
         self._settings.saved_positions.pop(source, None)
         self.save()
-
-
-_settings_manager: SettingsManager | None = None
-
-
-def get_settings_manager() -> SettingsManager:
-    """Get the global settings manager."""
-    global _settings_manager
-    if _settings_manager is None:
-        _settings_manager = SettingsManager()
-    return _settings_manager
