@@ -1,5 +1,7 @@
 """Core logic for RSVP application."""
 
+import logging
+
 from rsvp.core.constants import (
     ALLOWED_URL_SCHEMES,
     DEFAULT_SKIP_WORDS,
@@ -40,8 +42,6 @@ from rsvp.core.tts import (
     TTSDriver,
     create_tts_driver,
 )
-
-import logging
 
 logger = logging.getLogger(__name__)
 

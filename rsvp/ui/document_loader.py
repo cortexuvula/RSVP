@@ -64,7 +64,8 @@ class DocumentLoader:
         self._maybe_save_position()
         try:
             text = load_text_from_file(filepath)
-        except Exception as e:
+        except (OSError, ValueError) as e:
+            logger.exception("Failed to load file: %s", filepath)
             QMessageBox.warning(self._parent, "Error", f"Failed to load file: {e}")
             return False
 
@@ -113,8 +114,8 @@ class DocumentLoader:
             text: str = pyperclip.paste()
             if text:
                 return text
-        except Exception:
-            pass
+        except (ImportError, OSError) as e:
+            logger.debug("pyperclip unavailable, falling back to Qt clipboard: %s", e)
         from PyQt6.QtWidgets import QApplication
 
         return QApplication.clipboard().text()
