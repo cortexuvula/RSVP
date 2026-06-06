@@ -5,16 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.4.0] - 2026-06-06
 
 ### Added
 - Text-to-speech (TTS): offline, uses the OS default voice via pyttsx3. Each displayed word is spoken as it appears; pause interrupts mid-utterance. Toggle in Settings → Behavior.
 - Reading statistics: track all-time totals (words, time, sessions, lifetime avg WPM), per-document breakdown, and last 30 sessions. View via Help → Reading Statistics.
 - Theme presets: switch between Dark, Light, Sepia, and Solarized Light via Settings → Display → Theme. Selecting a theme updates the colors and font family; manual edits switch the dropdown to "Custom".
-- Text-to-speech (TTS): offline, uses the OS default voice via pyttsx3. Each displayed word is spoken as it appears; pause interrupts mid-utterance. Toggle in Settings → Behavior.
 
 ### Changed
 - Replace `requirements.txt` with `pyproject.toml` as the canonical dependency source
+- Replace `get_settings_manager()` singleton with constructor dependency injection across `MainWindow`, `RSVPEngine`, document/bookmark controllers, settings dialog, and word display, enabling per-test isolated settings fixtures
 
 ## [1.3.5] - 2026-05-15
 
