@@ -7,6 +7,7 @@ from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QCheckBox,
     QColorDialog,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFontComboBox,
@@ -18,7 +19,14 @@ from PyQt6.QtWidgets import (
 )
 
 from rsvp.core.constants import FONT_SIZE_MAX, FONT_SIZE_MIN, WPM_MAX, WPM_MIN
-from rsvp.core.settings import SettingsManager
+from rsvp.core.settings import get_settings_manager
+from rsvp.core.themes import (
+    CUSTOM_THEME_SENTINEL,
+    DEFAULT_THEME_NAME,
+    THEME_NAMES,
+    THEMES,
+    get_theme,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,12 +71,10 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(450)
-        self._settings = settings
         self._setup_ui()
         self._load_settings()
         # Snapshot for rollback if user clicks Apply then Cancel
-        if self._settings is not None:
-            self._original_settings = asdict(self._settings.settings)
+        self._original_settings = asdict(get_settings_manager().settings)
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -77,7 +83,15 @@ class SettingsDialog(QDialog):
         display_group = QGroupBox("Display")
         display_layout = QFormLayout()
 
+        # Theme dropdown (applies to colors + font)
+        self.theme_combo = QComboBox()
+        self.theme_combo.addItems(THEME_NAMES)
+        self.theme_combo.addItem(CUSTOM_THEME_SENTINEL)
+        self.theme_combo.currentTextChanged.connect(self._on_theme_changed)
+        display_layout.addRow("Theme:", self.theme_combo)
+
         self.font_combo = QFontComboBox()
+        self.font_combo.currentFontChanged.connect(self._on_color_or_font_changed)
         display_layout.addRow("Font:", self.font_combo)
 
         self.font_size_spin = QSpinBox()
@@ -86,12 +100,15 @@ class SettingsDialog(QDialog):
         display_layout.addRow("Font Size:", self.font_size_spin)
 
         self.text_color_btn = ColorButton("#FFFFFF")
+        self.text_color_btn.clicked.connect(self._on_color_or_font_changed)
         display_layout.addRow("Text Color:", self.text_color_btn)
 
         self.orp_color_btn = ColorButton("#FF6B6B")
+        self.orp_color_btn.clicked.connect(self._on_color_or_font_changed)
         display_layout.addRow("ORP Color:", self.orp_color_btn)
 
         self.bg_color_btn = ColorButton("#1E1E1E")
+        self.bg_color_btn.clicked.connect(self._on_color_or_font_changed)
         display_layout.addRow("Background:", self.bg_color_btn)
 
         display_group.setLayout(display_layout)
@@ -141,9 +158,7 @@ class SettingsDialog(QDialog):
 
     def _load_settings(self) -> None:
         """Load current settings into the dialog."""
-        if self._settings is None:
-            return
-        settings = self._settings.settings
+        settings = get_settings_manager().settings
 
         self.font_combo.setCurrentFont(QFont(settings.font_family))
         self.font_size_spin.setValue(settings.font_size)
@@ -158,9 +173,8 @@ class SettingsDialog(QDialog):
 
     def _apply(self) -> None:
         """Apply settings without closing."""
-        if self._settings is None:
-            return
-        settings = self._settings.settings
+        manager = get_settings_manager()
+        settings = manager.settings
 
         settings.font_family = self.font_combo.currentFont().family()
         settings.font_size = self.font_size_spin.value()
@@ -173,7 +187,14 @@ class SettingsDialog(QDialog):
         settings.auto_save_position = self.auto_save_check.isChecked()
         settings.tts_enabled = self.tts_check.isChecked()
 
-        self._settings.save()
+        # Persist the active theme name (only if the dropdown shows a real theme;
+        # "Custom" means the user kept their previous theme_name and tweaked values)
+        current_dropdown = self.theme_combo.currentText()
+        if current_dropdown in THEMES:
+            settings.theme_name = current_dropdown
+        # else: keep settings.theme_name as it was
+
+        manager.save()
         logger.info("Settings applied")
 
     def _save_and_accept(self) -> None:
@@ -183,11 +204,9 @@ class SettingsDialog(QDialog):
 
     def reject(self) -> None:
         """Restore original settings on cancel (undoes any Apply clicks)."""
-        if self._settings is None:
-            super().reject()
-            return
+        manager = get_settings_manager()
         for key, value in self._original_settings.items():
-            if hasattr(self._settings.settings, key):
-                setattr(self._settings.settings, key, value)
-        self._settings.save()
+            if hasattr(manager.settings, key):
+                setattr(manager.settings, key, value)
+        manager.save()
         super().reject()
