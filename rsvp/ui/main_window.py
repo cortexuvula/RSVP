@@ -1,7 +1,5 @@
 """Main application window."""
 
-import logging
-
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStatusBar, QVBoxLayout, QWidget
@@ -17,15 +15,12 @@ from rsvp.ui.controls import PlaybackControls, ProgressWidget, SpeedControl
 from rsvp.ui.document_loader import DocumentLoader
 from rsvp.ui.menu_builder import MenuBuilder
 from rsvp.ui.settings_dialog import SettingsDialog
-from rsvp.ui.stats_dialog import StatsDialog
 from rsvp.ui.text_input_dialog import TextInputDialog
 from rsvp.ui.word_display import WordDisplayWidget
 
-logger = logging.getLogger(__name__)
-
 
 class MainWindow(QMainWindow):
-    """Main application window.
+    """Main application window."""
 
     def __init__(self, settings: SettingsManager | None = None) -> None:
         super().__init__()
@@ -45,7 +40,6 @@ class MainWindow(QMainWindow):
         self.installEventFilter(self)
         self._setup_tab_order()
         self._check_settings_reset()
-        logger.info("MainWindow initialized")
 
     # ------------------------------------------------------------------
     # Accessors used by MenuBuilder
@@ -71,7 +65,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self.word_display = WordDisplayWidget(settings=self._settings)
+        self.word_display = WordDisplayWidget()
         layout.addWidget(self.word_display, stretch=1)
 
         controls_panel = QWidget()
@@ -116,7 +110,6 @@ class MainWindow(QMainWindow):
             submenu=self.bookmarks_submenu,
             status_setter=self.status_label.setText,
             current_file_getter=lambda: self._current_file,
-            settings=self._settings,
         )
         self._documents = DocumentLoader(
             parent_widget=self,
@@ -125,7 +118,6 @@ class MainWindow(QMainWindow):
             title_setter=self.setWindowTitle,
             on_loaded=self._on_document_loaded,
             current_file_getter=lambda: self._current_file,
-            settings=self._settings,
         )
         self._bookmarks.refresh_menu()
 
@@ -188,7 +180,7 @@ class MainWindow(QMainWindow):
 
     def _load_window_settings(self) -> None:
         """Load window position and size from settings."""
-        settings = self._settings.settings
+        settings = get_settings_manager().settings
 
         self.resize(settings.window_width, settings.window_height)
 
@@ -203,18 +195,19 @@ class MainWindow(QMainWindow):
 
     def _save_window_settings(self) -> None:
         """Save window position and size to settings."""
-        settings = self._settings.settings
+        manager = get_settings_manager()
+        settings = manager.settings
 
         settings.window_width = self.width()
         settings.window_height = self.height()
         settings.window_x = self.x()
         settings.window_y = self.y()
 
-        self._settings.save()
+        manager.save()
 
     def _apply_settings(self) -> None:
         """Apply current settings to UI."""
-        settings = self._settings.settings
+        settings = get_settings_manager().settings
         self.word_display.update_settings()
         self._tts.set_enabled(settings.tts_enabled)
 
@@ -231,7 +224,7 @@ class MainWindow(QMainWindow):
         from PyQt6.QtGui import QAction
 
         self.recent_menu.clear()
-        settings = self._settings.settings
+        settings = get_settings_manager().settings
 
         for filepath in settings.recent_files:
             action = QAction(filepath, self)
@@ -251,15 +244,7 @@ class MainWindow(QMainWindow):
         """Show the text input dialog."""
         dialog = TextInputDialog(self)
         if dialog.exec():
-            text = dialog.get_text()
-            source = dialog.get_source_path()
-            self._documents.load_from_text_dialog(text, source)
-            if source and source.startswith(("http://", "https://")):
-                self._stats_recorder.set_source(source, "url")
-            elif source:
-                self._stats_recorder.set_source(source, "file")
-            else:
-                self._stats_recorder.set_source(None, "paste")
+            self._documents.load_from_text_dialog(dialog.get_text(), dialog.get_source_path())
 
     def _open_file(self) -> None:
         """Open a file directly."""
@@ -271,16 +256,11 @@ class MainWindow(QMainWindow):
 
     def _paste_and_read(self) -> None:
         """Paste from clipboard and start reading."""
-        self._stats_recorder.set_source(None, "clipboard")
         self._documents.load_from_clipboard()
 
     def _on_document_loaded(self, source: str | None) -> None:
         """Hook called by DocumentLoader after each successful load."""
         self._current_file = source
-        if source and source.startswith(("http://", "https://")):
-            self._stats_recorder.set_source(source, "url")
-        else:
-            self._stats_recorder.set_source(source, "file")
         self._update_recent_menu()
         self._bookmarks.refresh_menu()
 
@@ -290,10 +270,10 @@ class MainWindow(QMainWindow):
 
     def _show_settings(self) -> None:
         """Show the settings dialog."""
-        dialog = SettingsDialog(self, settings=self._settings)
+        dialog = SettingsDialog(self)
         if dialog.exec():
             self._apply_settings()
-            self.speed_control.set_wpm(self._settings.settings.wpm)
+            self.speed_control.set_wpm(get_settings_manager().settings.wpm)
 
     def _toggle_always_on_top(self) -> None:
         """Toggle always on top."""
@@ -301,8 +281,9 @@ class MainWindow(QMainWindow):
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, on_top)
         self.show()
 
-        self._settings.settings.always_on_top = on_top
-        self._settings.save()
+        manager = get_settings_manager()
+        manager.settings.always_on_top = on_top
+        manager.save()
 
     def _toggle_fullscreen(self) -> None:
         """Toggle fullscreen mode."""
@@ -374,11 +355,6 @@ class MainWindow(QMainWindow):
             "Point (ORP) highlighted, allowing for faster reading speeds.</p>",
         )
 
-    def _show_statistics(self):
-        """Show the reading statistics dialog."""
-        dialog = StatsDialog(self, stats_manager=self._stats_manager)
-        dialog.exec()
-
     # ------------------------------------------------------------------
     # Signal handlers
     # ------------------------------------------------------------------
@@ -415,7 +391,7 @@ class MainWindow(QMainWindow):
 
     def _check_settings_reset(self) -> None:
         """Show notification if settings were reset due to corruption."""
-        if self._settings.was_reset():
+        if get_settings_manager().was_reset():
             QMessageBox.warning(
                 self,
                 "Settings Reset",
@@ -425,7 +401,7 @@ class MainWindow(QMainWindow):
 
     def _check_settings_save_failed(self) -> None:
         """Show notification if settings could not be saved (e.g. read-only filesystem)."""
-        if self._settings.save_failed():
+        if get_settings_manager().save_failed():
             self.status_label.setText("Warning: settings could not be saved (filesystem error)")
 
     def closeEvent(self, event) -> None:
