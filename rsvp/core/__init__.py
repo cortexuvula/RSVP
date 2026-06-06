@@ -33,10 +33,18 @@ from rsvp.core.text_processor import (
     process_text,
     strip_markdown,
 )
+from rsvp.core.transfer import (
+    BACKUP_SUFFIX,
+    EXPORT_FORMAT_VERSION,
+    export_to_file,
+    import_from_file,
+)
 
 __all__ = [
     "ALLOWED_URL_SCHEMES",
+    "BACKUP_SUFFIX",
     "DEFAULT_SKIP_WORDS",
+    "EXPORT_FORMAT_VERSION",
     "FONT_SIZE_MAX",
     "FONT_SIZE_MIN",
     "PAUSE_CLAUSE",
@@ -57,9 +65,11 @@ __all__ = [
     "Word",
     "calculate_orp",
     "calculate_pause_multiplier",
+    "export_to_file",
     "extract_text_from_html",
     "fetch_text_from_url",
     "get_settings_manager",
+    "import_from_file",
     "load_text_from_file",
     "process_text",
     "strip_markdown",
