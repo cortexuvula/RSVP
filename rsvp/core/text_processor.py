@@ -148,6 +148,62 @@ def process_text(text: str) -> list[Word]:
     return all_words
 
 
+def process_text_into_chunks(text: str, chunk_size: int) -> list[Word]:
+    """Group `text` into chunks of `chunk_size` words, aligned to paragraph boundaries.
+
+    Each chunk becomes a Word with:
+      - .text: the joined words (e.g., "the quick brown")
+      - .orp_index: the ORP of the FIRST word in the chunk (single focal point)
+      - .pause_after: the pause multiplier of the LAST word in the chunk
+      - .paragraph_break_after: True if this chunk ends a paragraph
+
+    Paragraph breaks (\\n\\n) never fall mid-chunk. The last chunk of a
+    paragraph may be shorter than chunk_size if the paragraph's word
+    count doesn't divide evenly.
+
+    Empty input returns an empty list. chunk_size <= 1 falls through to
+    process_text() (no grouping).
+    """
+    if chunk_size <= 1:
+        return process_text(text)
+    if not text or not text.strip():
+        return []
+
+    paragraphs = re.split(r"\n\s*\n", text)
+    all_chunks: list[Word] = []
+    paragraph_end_indices: list[int] = []
+
+    for para in paragraphs:
+        normalized = re.sub(r"\s+", " ", para.strip())
+        if not normalized:
+            continue
+        words = normalized.split(" ")
+        para_start = len(all_chunks)
+        for i in range(0, len(words), chunk_size):
+            chunk_words = words[i : i + chunk_size]
+            if not chunk_words:
+                continue
+            chunk_text = " ".join(chunk_words)
+            first_word = chunk_words[0]
+            orp_idx = calculate_orp(first_word)
+            last_word = chunk_words[-1]
+            pause_mult = calculate_pause_multiplier(last_word)
+            all_chunks.append(
+                Word(
+                    text=chunk_text,
+                    orp_index=orp_idx,
+                    pause_after=pause_mult,
+                )
+            )
+        if len(all_chunks) > para_start:
+            paragraph_end_indices.append(len(all_chunks) - 1)
+
+    for idx in paragraph_end_indices[:-1]:
+        all_chunks[idx].paragraph_break_after = True
+
+    return all_chunks
+
+
 def extract_text_from_html(html: str) -> str:
     """Extract readable text from HTML content."""
     from bs4 import BeautifulSoup

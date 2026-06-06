@@ -1,5 +1,6 @@
 """RSVP playback engine."""
 
+import logging
 from dataclasses import dataclass, field
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
@@ -13,6 +14,8 @@ from rsvp.core.constants import (
 )
 from rsvp.core.settings import get_settings_manager
 from rsvp.core.text_processor import Word, process_text
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -104,7 +107,20 @@ class RSVPEngine(QObject):
     def load_text(self, text: str):
         """Load text for RSVP display."""
         self.stop()
-        self._state.words = process_text(text)
+        from rsvp.core.text_processor import (
+            process_text_into_chunks,
+        )
+
+        chunk_size = 1
+        try:
+            manager = get_settings_manager()
+            chunk_size = getattr(manager.settings, "chunk_size", 1) or 1
+        except Exception:  # noqa: BLE001  (fall back to default if settings unavailable)
+            chunk_size = 1
+        if chunk_size > 1:
+            self._state.words = process_text_into_chunks(text, chunk_size)
+        else:
+            self._state.words = process_text(text)
         self._state.current_index = 0
         self.state_changed.emit()
         self.progress_changed.emit(0.0)
@@ -112,6 +128,7 @@ class RSVPEngine(QObject):
             self.word_changed.emit(self._state.current_word)
         else:
             self.word_changed.emit(None)
+        logger.info("Loaded %d %s into engine", len(self._state.words), "chunks" if chunk_size > 1 else "words")
 
     def play(self):
         """Start or resume playback."""

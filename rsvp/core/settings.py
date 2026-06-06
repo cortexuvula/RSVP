@@ -23,6 +23,9 @@ class RSVPSettings:
     background_color: str = "#1E1E1E"
     orp_color: str = "#FF6B6B"
 
+    # Chunk mode: 1, 2, or 3 words per display
+    chunk_size: int = 1
+
     # Behavior settings
     pause_at_paragraphs: bool = True
     auto_save_position: bool = True
