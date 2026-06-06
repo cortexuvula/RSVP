@@ -41,13 +41,23 @@ from rsvp.core.text_processor import (
     process_text,
     strip_markdown,
 )
+from rsvp.core.themes import (
+    CUSTOM_THEME_SENTINEL,
+    DEFAULT_THEME_NAME,
+    THEME_NAMES,
+    THEMES,
+    Theme,
+    get_theme,
+)
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     "ALLOWED_URL_SCHEMES",
     "AllTimeStats",
+    "CUSTOM_THEME_SENTINEL",
     "DEFAULT_SKIP_WORDS",
+    "DEFAULT_THEME_NAME",
     "DocumentStats",
     "FONT_SIZE_MAX",
     "FONT_SIZE_MIN",
@@ -63,6 +73,9 @@ __all__ = [
     "SettingsManager",
     "StatsData",
     "StatsManager",
+    "THEME_NAMES",
+    "THEMES",
+    "Theme",
     "URL_FETCH_TIMEOUT_SECONDS",
     "WPM_DEFAULT",
     "WPM_MAX",
@@ -74,6 +87,8 @@ __all__ = [
     "calculate_pause_multiplier",
     "extract_text_from_html",
     "fetch_text_from_url",
+    "get_settings_manager",
+    "get_theme",
     "load_text_from_file",
     "process_text",
     "strip_markdown",

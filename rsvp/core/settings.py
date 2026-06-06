@@ -8,6 +8,8 @@ import shutil
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from rsvp.core.themes import DEFAULT_THEME_NAME
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,6 +35,9 @@ class RSVPSettings:
     window_x: int | None = None
     window_y: int | None = None
     always_on_top: bool = False
+
+    # Theme
+    theme_name: str = DEFAULT_THEME_NAME
 
     # Recent files
     recent_files: list[str] = field(default_factory=list)

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Reading statistics: track all-time totals (words, time, sessions, lifetime avg WPM), per-document breakdown, and last 30 sessions. View via Help → Reading Statistics.
+- Theme presets: switch between Dark, Light, Sepia, and Solarized Light via Settings → Display → Theme. Selecting a theme updates the colors and font family; manual edits switch the dropdown to "Custom".
 
 ### Changed
 - Replace `requirements.txt` with `pyproject.toml` as the canonical dependency source
