@@ -1,5 +1,6 @@
 """Export and import settings (and stats if available) to/from a single JSON file."""
 
+import importlib.util
 import json
 import logging
 import shutil
@@ -14,15 +15,11 @@ logger = logging.getLogger(__name__)
 EXPORT_FORMAT_VERSION = 1
 BACKUP_SUFFIX = ".imported.bak"
 
-# Optional stats import (may not be available on every branch)
-try:
-    from rsvp.core.stats import StatsData, StatsManager  # type: ignore[import-not-found]
-
-    _STATS_AVAILABLE = True
-except ImportError:
-    StatsData = None  # type: ignore[assignment,misc]
-    StatsManager = None  # type: ignore[assignment,misc]
-    _STATS_AVAILABLE = False
+# Optional stats module (may not be available on every branch).
+# We use importlib.util.find_spec to detect availability without
+# actually importing the module — this keeps the import cheap and
+# avoids spurious F401 lint errors when stats isn't used.
+_STATS_AVAILABLE = importlib.util.find_spec("rsvp.core.stats") is not None
 
 
 def export_to_file(

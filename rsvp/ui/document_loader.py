@@ -105,7 +105,7 @@ class DocumentLoader:
         try:
             import pyperclip
 
-            text = pyperclip.paste()
+            text: str = pyperclip.paste()
             if text:
                 return text
         except Exception:

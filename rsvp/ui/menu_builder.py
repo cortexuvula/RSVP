@@ -141,7 +141,7 @@ class MenuBuilder:
         help_menu.addAction(about_action)
 
         return MenuRefs(
-            recent_menu=recent_menu,
-            bookmarks_submenu=bookmarks_submenu,
+            recent_menu=recent_menu,  # type: ignore[arg-type]  # PyQt6 stubs widen addMenu return to QMenu | None
+            bookmarks_submenu=bookmarks_submenu,  # type: ignore[arg-type]  # same
             always_on_top_action=always_on_top_action,
         )
