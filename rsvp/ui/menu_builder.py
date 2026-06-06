@@ -119,6 +119,12 @@ class MenuBuilder:
 
         help_menu = menubar.addMenu("&Help")
 
+        stats_action = QAction("&Reading Statistics", self._window)
+        stats_action.triggered.connect(host._show_statistics)
+        help_menu.addAction(stats_action)
+
+        help_menu.addSeparator()
+
         shortcuts_action = QAction("Keyboard &Shortcuts", self._window)
         shortcuts_action.setShortcut("F1")
         shortcuts_action.triggered.connect(host._show_shortcuts)
