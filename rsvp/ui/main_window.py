@@ -1,5 +1,7 @@
 """Main application window."""
 
+import logging
+
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStatusBar, QVBoxLayout, QWidget
@@ -17,6 +19,8 @@ from rsvp.ui.menu_builder import MenuBuilder
 from rsvp.ui.settings_dialog import SettingsDialog
 from rsvp.ui.text_input_dialog import TextInputDialog
 from rsvp.ui.word_display import WordDisplayWidget
+
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
@@ -110,6 +114,7 @@ class MainWindow(QMainWindow):
             submenu=self.bookmarks_submenu,
             status_setter=self.status_label.setText,
             current_file_getter=lambda: self._current_file,
+            settings=self._settings,
         )
         self._documents = DocumentLoader(
             parent_widget=self,
@@ -118,6 +123,7 @@ class MainWindow(QMainWindow):
             title_setter=self.setWindowTitle,
             on_loaded=self._on_document_loaded,
             current_file_getter=lambda: self._current_file,
+            settings=self._settings,
         )
         self._bookmarks.refresh_menu()
 
@@ -180,7 +186,7 @@ class MainWindow(QMainWindow):
 
     def _load_window_settings(self) -> None:
         """Load window position and size from settings."""
-        settings = get_settings_manager().settings
+        settings = self._settings.settings
 
         self.resize(settings.window_width, settings.window_height)
 
@@ -195,7 +201,7 @@ class MainWindow(QMainWindow):
 
     def _save_window_settings(self) -> None:
         """Save window position and size to settings."""
-        manager = get_settings_manager()
+        manager = self._settings
         settings = manager.settings
 
         settings.window_width = self.width()
@@ -207,7 +213,7 @@ class MainWindow(QMainWindow):
 
     def _apply_settings(self) -> None:
         """Apply current settings to UI."""
-        settings = get_settings_manager().settings
+        settings = self._settings.settings
         self.word_display.update_settings()
         self._tts.set_enabled(settings.tts_enabled)
 
@@ -224,7 +230,7 @@ class MainWindow(QMainWindow):
         from PyQt6.QtGui import QAction
 
         self.recent_menu.clear()
-        settings = get_settings_manager().settings
+        settings = self._settings.settings
 
         for filepath in settings.recent_files:
             action = QAction(filepath, self)
@@ -273,7 +279,7 @@ class MainWindow(QMainWindow):
         dialog = SettingsDialog(self)
         if dialog.exec():
             self._apply_settings()
-            self.speed_control.set_wpm(get_settings_manager().settings.wpm)
+            self.speed_control.set_wpm(self._settings.settings.wpm)
 
     def _toggle_always_on_top(self) -> None:
         """Toggle always on top."""
@@ -281,7 +287,7 @@ class MainWindow(QMainWindow):
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, on_top)
         self.show()
 
-        manager = get_settings_manager()
+        manager = self._settings
         manager.settings.always_on_top = on_top
         manager.save()
 
@@ -385,13 +391,20 @@ class MainWindow(QMainWindow):
             self._settings.clear_position(self._current_file)
             logger.info("Reading finished; cleared saved position for %s", self._current_file)
 
+    def _show_statistics(self) -> None:
+        """Show the reading statistics dialog."""
+        from rsvp.ui.stats_dialog import StatsDialog
+
+        dialog = StatsDialog(self, stats_manager=self._stats_manager)
+        dialog.exec()
+
     # ------------------------------------------------------------------
     # Notifications / lifecycle
     # ------------------------------------------------------------------
 
     def _check_settings_reset(self) -> None:
         """Show notification if settings were reset due to corruption."""
-        if get_settings_manager().was_reset():
+        if self._settings.was_reset():
             QMessageBox.warning(
                 self,
                 "Settings Reset",
@@ -401,7 +414,7 @@ class MainWindow(QMainWindow):
 
     def _check_settings_save_failed(self) -> None:
         """Show notification if settings could not be saved (e.g. read-only filesystem)."""
-        if get_settings_manager().save_failed():
+        if self._settings.save_failed():
             self.status_label.setText("Warning: settings could not be saved (filesystem error)")
 
     def closeEvent(self, event) -> None:

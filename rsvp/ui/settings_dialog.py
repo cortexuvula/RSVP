@@ -30,19 +30,17 @@ from rsvp.core.themes import (
 
 logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
-
 
 class ColorButton(QPushButton):
     """Button that shows and allows selection of a color."""
 
-    def __init__(self, color: str, parent=None) -> None:
+    def __init__(self, color: str, parent=None):
         super().__init__(parent)
         self._color = QColor(color)
         self._update_style()
         self.clicked.connect(self._pick_color)
 
-    def _update_style(self) -> None:
+    def _update_style(self):
         self.setStyleSheet(
             f"background-color: {self._color.name()}; "
             f"color: {'white' if self._color.lightness() < 128 else 'black'}; "
@@ -50,7 +48,7 @@ class ColorButton(QPushButton):
         )
         self.setText(self._color.name())
 
-    def _pick_color(self) -> None:
+    def _pick_color(self):
         color = QColorDialog.getColor(self._color, self, "Select Color")
         if color.isValid():
             self._color = color
@@ -59,7 +57,7 @@ class ColorButton(QPushButton):
     def get_color(self) -> str:
         return self._color.name()
 
-    def set_color(self, color: str) -> None:
+    def set_color(self, color: str):
         self._color = QColor(color)
         self._update_style()
 
@@ -71,14 +69,15 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(450)
-        # Accept a SettingsManager via DI; fall back to the shim for legacy callers
+        # Accept a SettingsManager via DI; fall back to the shim so legacy callers
+        # (and the isolated_settings test fixture) keep working
         self._settings = settings if settings is not None else get_settings_manager()
         self._setup_ui()
         self._load_settings()
         # Snapshot for rollback if user clicks Apply then Cancel
         self._original_settings = asdict(self._settings.settings)
 
-    def _setup_ui(self) -> None:
+    def _setup_ui(self):
         layout = QVBoxLayout(self)
 
         # Display settings
@@ -160,7 +159,7 @@ class SettingsDialog(QDialog):
 
     def _load_settings(self) -> None:
         """Load current settings into the dialog."""
-        settings = get_settings_manager().settings
+        settings = self._settings.settings
 
         self.font_combo.setCurrentFont(QFont(settings.font_family))
         self.font_size_spin.setValue(settings.font_size)
@@ -173,10 +172,71 @@ class SettingsDialog(QDialog):
         self.auto_save_check.setChecked(settings.auto_save_position)
         self.tts_check.setChecked(settings.tts_enabled)
 
+        # Theme dropdown: show the stored theme if the values match,
+        # otherwise show "Custom" to indicate divergence
+        stored = settings.theme_name
+        active_name = stored
+        if stored in THEMES:
+            theme = get_theme(stored)
+            values_match = (
+                self.text_color_btn.get_color().lower() == theme.text_color.lower()
+                and self.orp_color_btn.get_color().lower() == theme.orp_color.lower()
+                and self.bg_color_btn.get_color().lower() == theme.background_color.lower()
+                and self.font_combo.currentFont().family() == theme.font_family
+            )
+            if values_match:
+                idx = self.theme_combo.findText(stored)
+                if idx >= 0:
+                    self.theme_combo.setCurrentIndex(idx)
+            else:
+                idx = self.theme_combo.findText(CUSTOM_THEME_SENTINEL)
+                if idx >= 0:
+                    self.theme_combo.setCurrentIndex(idx)
+        else:
+            # Unknown theme name in storage — fall back to default
+            idx = self.theme_combo.findText(DEFAULT_THEME_NAME)
+            if idx >= 0:
+                self.theme_combo.setCurrentIndex(idx)
+            active_name = DEFAULT_THEME_NAME
+        # _theme_active is set LAST so the manual-edit detector doesn't
+        # fire while the values are being loaded
+        self._theme_active = active_name
+
+    def _on_theme_changed(self, theme_name: str) -> None:
+        """User picked a theme from the dropdown. Update the color/font fields."""
+        if theme_name == CUSTOM_THEME_SENTINEL:
+            return
+        theme = get_theme(theme_name)
+        # Update the color buttons (signal-blocked via the pick_color path
+        # not firing; the manual-edit detector only fires on user click)
+        self.text_color_btn.set_color(theme.text_color)
+        self.orp_color_btn.set_color(theme.orp_color)
+        self.bg_color_btn.set_color(theme.background_color)
+        # blockSignals on the font combo to avoid triggering the manual-edit detector
+        self.font_combo.blockSignals(True)
+        self.font_combo.setCurrentFont(QFont(theme.font_family))
+        self.font_combo.blockSignals(False)
+        self._theme_active = theme_name
+
+    def _on_color_or_font_changed(self) -> None:
+        """User manually changed a color or font; switch dropdown to 'Custom'."""
+        if not getattr(self, "_theme_active", ""):
+            return
+        active = get_theme(self._theme_active)
+        diverged = (
+            self.text_color_btn.get_color().lower() != active.text_color.lower()
+            or self.orp_color_btn.get_color().lower() != active.orp_color.lower()
+            or self.bg_color_btn.get_color().lower() != active.background_color.lower()
+            or self.font_combo.currentFont().family() != active.font_family
+        )
+        if diverged and self.theme_combo.currentText() != CUSTOM_THEME_SENTINEL:
+            self.theme_combo.blockSignals(True)
+            self.theme_combo.setCurrentText(CUSTOM_THEME_SENTINEL)
+            self.theme_combo.blockSignals(False)
+
     def _apply(self) -> None:
         """Apply settings without closing."""
-        manager = get_settings_manager()
-        settings = manager.settings
+        settings = self._settings.settings
 
         settings.font_family = self.font_combo.currentFont().family()
         settings.font_size = self.font_size_spin.value()
@@ -196,19 +256,18 @@ class SettingsDialog(QDialog):
             settings.theme_name = current_dropdown
         # else: keep settings.theme_name as it was
 
-        manager.save()
+        self._settings.save()
         logger.info("Settings applied")
 
-    def _save_and_accept(self) -> None:
+    def _save_and_accept(self):
         """Save settings and close."""
         self._apply()
         self.accept()
 
     def reject(self) -> None:
         """Restore original settings on cancel (undoes any Apply clicks)."""
-        manager = get_settings_manager()
         for key, value in self._original_settings.items():
-            if hasattr(manager.settings, key):
-                setattr(manager.settings, key, value)
-        manager.save()
+            if hasattr(self._settings.settings, key):
+                setattr(self._settings.settings, key, value)
+        self._settings.save()
         super().reject()
