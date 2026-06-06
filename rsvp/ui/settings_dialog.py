@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from rsvp.core.constants import FONT_SIZE_MAX, FONT_SIZE_MIN, WPM_MAX, WPM_MIN
-from rsvp.core.settings import get_settings_manager
+from rsvp.core.settings import SettingsManager
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +26,13 @@ logger = logging.getLogger(__name__)
 class ColorButton(QPushButton):
     """Button that shows and allows selection of a color."""
 
-    def __init__(self, color: str, parent=None) -> None:
+    def __init__(self, color: str, parent=None):
         super().__init__(parent)
         self._color = QColor(color)
         self._update_style()
         self.clicked.connect(self._pick_color)
 
-    def _update_style(self) -> None:
+    def _update_style(self):
         self.setStyleSheet(
             f"background-color: {self._color.name()}; "
             f"color: {'white' if self._color.lightness() < 128 else 'black'}; "
@@ -40,7 +40,7 @@ class ColorButton(QPushButton):
         )
         self.setText(self._color.name())
 
-    def _pick_color(self) -> None:
+    def _pick_color(self):
         color = QColorDialog.getColor(self._color, self, "Select Color")
         if color.isValid():
             self._color = color
@@ -49,7 +49,7 @@ class ColorButton(QPushButton):
     def get_color(self) -> str:
         return self._color.name()
 
-    def set_color(self, color: str) -> None:
+    def set_color(self, color: str):
         self._color = QColor(color)
         self._update_style()
 
@@ -57,16 +57,18 @@ class ColorButton(QPushButton):
 class SettingsDialog(QDialog):
     """Dialog for application settings."""
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, settings: SettingsManager | None = None):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(450)
+        self._settings = settings
         self._setup_ui()
         self._load_settings()
         # Snapshot for rollback if user clicks Apply then Cancel
-        self._original_settings = asdict(get_settings_manager().settings)
+        if self._settings is not None:
+            self._original_settings = asdict(self._settings.settings)
 
-    def _setup_ui(self) -> None:
+    def _setup_ui(self):
         layout = QVBoxLayout(self)
 
         # Display settings
@@ -132,9 +134,11 @@ class SettingsDialog(QDialog):
         button_box.button(QDialogButtonBox.StandardButton.Apply).clicked.connect(self._apply)
         layout.addWidget(button_box)
 
-    def _load_settings(self) -> None:
+    def _load_settings(self):
         """Load current settings into the dialog."""
-        settings = get_settings_manager().settings
+        if self._settings is None:
+            return
+        settings = self._settings.settings
 
         self.font_combo.setCurrentFont(QFont(settings.font_family))
         self.font_size_spin.setValue(settings.font_size)
@@ -146,10 +150,11 @@ class SettingsDialog(QDialog):
         self.pause_paragraphs_check.setChecked(settings.pause_at_paragraphs)
         self.auto_save_check.setChecked(settings.auto_save_position)
 
-    def _apply(self) -> None:
+    def _apply(self):
         """Apply settings without closing."""
-        manager = get_settings_manager()
-        settings = manager.settings
+        if self._settings is None:
+            return
+        settings = self._settings.settings
 
         settings.font_family = self.font_combo.currentFont().family()
         settings.font_size = self.font_size_spin.value()
@@ -161,19 +166,21 @@ class SettingsDialog(QDialog):
         settings.pause_at_paragraphs = self.pause_paragraphs_check.isChecked()
         settings.auto_save_position = self.auto_save_check.isChecked()
 
-        manager.save()
+        self._settings.save()
         logger.info("Settings applied")
 
-    def _save_and_accept(self) -> None:
+    def _save_and_accept(self):
         """Save settings and close."""
         self._apply()
         self.accept()
 
-    def reject(self) -> None:
+    def reject(self):
         """Restore original settings on cancel (undoes any Apply clicks)."""
-        manager = get_settings_manager()
+        if self._settings is None:
+            super().reject()
+            return
         for key, value in self._original_settings.items():
-            if hasattr(manager.settings, key):
-                setattr(manager.settings, key, value)
-        manager.save()
+            if hasattr(self._settings.settings, key):
+                setattr(self._settings.settings, key, value)
+        self._settings.save()
         super().reject()

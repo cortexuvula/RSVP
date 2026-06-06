@@ -23,7 +23,6 @@ from rsvp.core.rsvp_engine import RSVPEngine, RSVPState
 from rsvp.core.settings import (
     RSVPSettings,
     SettingsManager,
-    get_settings_manager,
 )
 from rsvp.core.text_processor import (
     Word,
@@ -63,7 +62,6 @@ __all__ = [
     "calculate_pause_multiplier",
     "extract_text_from_html",
     "fetch_text_from_url",
-    "get_settings_manager",
     "load_text_from_file",
     "process_text",
     "strip_markdown",

@@ -7,7 +7,7 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QMenu, QMessageBox, QWidget
 
 from rsvp.core.rsvp_engine import RSVPEngine
-from rsvp.core.settings import get_settings_manager
+from rsvp.core.settings import SettingsManager
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +22,14 @@ class BookmarkController:
         submenu: QMenu,
         status_setter: Callable[[str], None],
         current_file_getter: Callable[[], str | None],
+        settings: SettingsManager | None = None,
     ) -> None:
         self._parent = parent_widget
         self._engine = engine
         self._submenu = submenu
         self._set_status = status_setter
         self._get_current_file = current_file_getter
+        self._settings = settings
 
     def add(self) -> None:
         """Add a bookmark at the engine's current position."""
@@ -40,7 +42,9 @@ class BookmarkController:
             )
             return
 
-        get_settings_manager().add_bookmark(current_file, self._engine.current_index)
+        if self._settings is None:
+            return
+        self._settings.add_bookmark(current_file, self._engine.current_index)
         self.refresh_menu()
         self._set_status(f"Bookmark added at word {self._engine.current_index}")
         logger.info("Bookmark added at word %d in %s", self._engine.current_index, current_file)
@@ -51,14 +55,16 @@ class BookmarkController:
         if not current_file:
             return
 
-        bookmarks = get_settings_manager().get_bookmarks(current_file)
+        if self._settings is None:
+            return
+        bookmarks = self._settings.get_bookmarks(current_file)
         if not bookmarks:
             self._set_status("No bookmarks to remove")
             return
 
         current = self._engine.current_index
         if current in bookmarks:
-            get_settings_manager().remove_bookmark(current_file, current)
+            self._settings.remove_bookmark(current_file, current)
             self.refresh_menu()
             self._set_status(f"Bookmark removed at word {current}")
             logger.info("Bookmark removed at word %d in %s", current, current_file)
@@ -74,7 +80,10 @@ class BookmarkController:
             self._add_placeholder("No bookmarks")
             return
 
-        bookmarks = get_settings_manager().get_bookmarks(current_file)
+        if self._settings is None:
+            self._add_placeholder("No bookmarks")
+            return
+        bookmarks = self._settings.get_bookmarks(current_file)
         if not bookmarks:
             self._add_placeholder("No bookmarks")
             return

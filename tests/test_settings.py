@@ -295,3 +295,47 @@ class TestSettingsSaveFailure:
     def test_save_failed_false_on_success(self, manager):
         manager.save()
         assert manager.save_failed() is False
+
+
+class TestSettingsInjection:
+    """Verify SettingsManager can be injected without using the singleton."""
+
+    def test_engine_accepts_injected_settings(self, tmp_path, qapp):
+        from rsvp.core.rsvp_engine import RSVPEngine
+        from rsvp.core.settings import RSVPSettings, SettingsManager
+
+        manager = SettingsManager.__new__(SettingsManager)
+        manager._settings = RSVPSettings()
+        manager._config_path = tmp_path / "settings.json"
+        manager._settings_were_reset = False
+        manager._save_failed = False
+
+        engine = RSVPEngine(settings=manager)
+        # The injected manager is the one used; mutate it and verify
+        # the engine sees the change.
+        engine._settings.settings.pause_at_paragraphs = False
+        assert manager.settings.pause_at_paragraphs is False
+
+    def test_word_display_accepts_injected_settings(self, tmp_path, qapp):
+        from rsvp.core.settings import RSVPSettings, SettingsManager
+        from rsvp.ui.word_display import WordDisplayWidget
+
+        manager = SettingsManager.__new__(SettingsManager)
+        manager._settings = RSVPSettings(font_family="Courier", font_size=24)
+        manager._config_path = tmp_path / "settings.json"
+        manager._settings_were_reset = False
+        manager._save_failed = False
+
+        widget = WordDisplayWidget(settings=manager)
+        # The widget used the injected settings
+        assert widget.word_display._font.family() == "Courier"
+        assert widget.word_display._font.pointSize() == 24
+
+    def test_get_settings_manager_removed(self):
+        """The singleton accessor must be gone after the DI refactor."""
+        import rsvp.core as core_mod
+        import rsvp.core.settings as settings_mod
+
+        sentinel = object()
+        assert getattr(settings_mod, "get_settings_manager", sentinel) is sentinel
+        assert getattr(core_mod, "get_settings_manager", sentinel) is sentinel

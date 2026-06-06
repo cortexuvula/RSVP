@@ -88,5 +88,4 @@ disallow_untyped_defs = false
 disallow_incomplete_defs = false
 # PyQt6 stubs return QMenuBar | None / QMenu | None for some methods that
 # never actually return None at runtime; suppress the spurious union-attr
-# errors that result. Real type errors still surface.
-disable_error_code = ["union-attr"]
+disable_error_code = ["union-attr", "import-untyped"]

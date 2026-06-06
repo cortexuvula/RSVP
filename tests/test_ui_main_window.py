@@ -11,18 +11,15 @@ pytest.importorskip("pytestqt", reason="pytest-qt required for UI tests")
 
 
 @pytest.fixture
-def isolated_settings(tmp_path, monkeypatch):
-    """Point the global settings manager at a temp config path for isolation."""
-    from rsvp.core import settings as settings_mod
-
-    mgr = SettingsManager.__new__(SettingsManager)
+def isolated_settings(tmp_path):
+    """Create an isolated SettingsManager pointing at a temp config path."""
     from rsvp.core.settings import RSVPSettings
 
+    mgr = SettingsManager.__new__(SettingsManager)
     mgr._settings = RSVPSettings()
     mgr._settings_were_reset = False
     mgr._save_failed = False
     mgr._config_path = tmp_path / "settings.json"
-    monkeypatch.setattr(settings_mod, "_settings_manager", mgr)
     return mgr
 
 
@@ -30,7 +27,7 @@ def isolated_settings(tmp_path, monkeypatch):
 def main_window(qtbot, isolated_settings):
     from rsvp.ui.main_window import MainWindow
 
-    w = MainWindow()
+    w = MainWindow(settings=isolated_settings)
     qtbot.addWidget(w)
     return w
 

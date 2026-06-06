@@ -1,6 +1,5 @@
 """RSVP playback engine."""
 
-import logging
 from dataclasses import dataclass, field
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
@@ -12,10 +11,8 @@ from rsvp.core.constants import (
     WPM_MAX,
     WPM_MIN,
 )
-from rsvp.core.settings import get_settings_manager
+from rsvp.core.settings import SettingsManager
 from rsvp.core.text_processor import Word, process_text
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -66,8 +63,9 @@ class RSVPEngine(QObject):
     progress_changed = pyqtSignal(float)  # Emits progress percentage
     finished = pyqtSignal()  # Emits when reaching end of text
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, settings: SettingsManager | None = None):
         super().__init__(parent)
+        self._settings = settings
         self._state = RSVPState()
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._advance)
@@ -83,7 +81,7 @@ class RSVPEngine(QObject):
         return self._state.wpm
 
     @wpm.setter
-    def wpm(self, value: int) -> None:
+    def wpm(self, value: int):
         """Set words per minute."""
         self._state.wpm = max(WPM_MIN, min(WPM_MAX, value))
         if self._state.is_playing:
@@ -104,20 +102,19 @@ class RSVPEngine(QObject):
         """Get total word count."""
         return len(self._state.words)
 
-    def load_text(self, text: str) -> None:
+    def load_text(self, text: str):
         """Load text for RSVP display."""
         self.stop()
         self._state.words = process_text(text)
         self._state.current_index = 0
         self.state_changed.emit()
         self.progress_changed.emit(0.0)
-        logger.info("Loaded %d words into engine", len(self._state.words))
         if self._state.words:
             self.word_changed.emit(self._state.current_word)
         else:
             self.word_changed.emit(None)
 
-    def play(self) -> None:
+    def play(self):
         """Start or resume playback."""
         if not self._state.words:
             return
@@ -129,24 +126,22 @@ class RSVPEngine(QObject):
         self._state.is_playing = True
         self._update_timer_interval()
         self._timer.start()
-        logger.debug("Engine play() at index %d", self._state.current_index)
         self.state_changed.emit()
 
-    def pause(self) -> None:
+    def pause(self):
         """Pause playback."""
         self._state.is_playing = False
         self._timer.stop()
-        logger.debug("Engine pause() at index %d", self._state.current_index)
         self.state_changed.emit()
 
-    def toggle_play_pause(self) -> None:
+    def toggle_play_pause(self):
         """Toggle between play and pause."""
         if self._state.is_playing:
             self.pause()
         else:
             self.play()
 
-    def stop(self) -> None:
+    def stop(self):
         """Stop playback and reset to beginning."""
         self._state.is_playing = False
         self._timer.stop()
@@ -156,17 +151,16 @@ class RSVPEngine(QObject):
         if self._state.words:
             self.word_changed.emit(self._state.current_word)
 
-    def seek(self, index: int) -> None:
+    def seek(self, index: int):
         """Seek to a specific word index."""
         if not self._state.words:
             return
 
         self._state.current_index = max(0, min(index, len(self._state.words) - 1))
-        logger.debug("Engine seek() to index %d", self._state.current_index)
         self.word_changed.emit(self._state.current_word)
         self.progress_changed.emit(self._state.progress)
 
-    def seek_percent(self, percent: float) -> None:
+    def seek_percent(self, percent: float):
         """Seek to a percentage of the text."""
         if not self._state.words:
             return
@@ -177,15 +171,15 @@ class RSVPEngine(QObject):
             index = round((percent / 100) * (len(self._state.words) - 1))
         self.seek(index)
 
-    def skip_forward(self, words: int = DEFAULT_SKIP_WORDS) -> None:
+    def skip_forward(self, words: int = DEFAULT_SKIP_WORDS):
         """Skip forward by a number of words."""
         self.seek(self._state.current_index + words)
 
-    def skip_backward(self, words: int = DEFAULT_SKIP_WORDS) -> None:
+    def skip_backward(self, words: int = DEFAULT_SKIP_WORDS):
         """Skip backward by a number of words."""
         self.seek(self._state.current_index - words)
 
-    def previous_sentence(self) -> None:
+    def previous_sentence(self):
         """Go to the beginning of the current or previous sentence."""
         if not self._state.words:
             return
@@ -210,7 +204,7 @@ class RSVPEngine(QObject):
         # No previous sentence found, go to beginning
         self.seek(0)
 
-    def next_sentence(self) -> None:
+    def next_sentence(self):
         """Go to the beginning of the next sentence."""
         if not self._state.words:
             return
@@ -229,21 +223,21 @@ class RSVPEngine(QObject):
         # No next sentence found, go to end
         self.seek(len(self._state.words) - 1)
 
-    def _update_timer_interval(self) -> None:
+    def _update_timer_interval(self):
         """Update timer interval based on WPM and current word."""
         base_interval = 60000 / self._state.wpm
 
         current = self._state.current_word
         if current:
             interval = base_interval * current.pause_after
-            if current.paragraph_break_after and get_settings_manager().settings.pause_at_paragraphs:
+            if current.paragraph_break_after and self._settings is not None and self._settings.settings.pause_at_paragraphs:
                 interval *= PAUSE_PARAGRAPH
         else:
             interval = base_interval
 
         self._timer.setInterval(int(interval))
 
-    def _advance(self) -> None:
+    def _advance(self):
         """Advance to the next word."""
         self._state.current_index += 1
 
