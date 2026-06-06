@@ -168,3 +168,23 @@ class SettingsManager:
         """Clear saved reading position for a source."""
         self._settings.saved_positions.pop(source, None)
         self.save()
+
+
+_settings_manager: SettingsManager | None = None
+
+
+def get_settings_manager() -> SettingsManager:
+    """Backwards-compatible singleton accessor.
+
+    Returns a global SettingsManager instance, creating one on first
+    access. Prefer dependency injection (passing a SettingsManager via
+    constructor) for new code; this shim exists for legacy callers
+    that still call get_settings_manager().
+
+    Tests can monkeypatch this in the consumer module's namespace
+    (rsvp.ui.settings_dialog.get_settings_manager) to inject a fixture.
+    """
+    global _settings_manager
+    if _settings_manager is None:
+        _settings_manager = SettingsManager()
+    return _settings_manager

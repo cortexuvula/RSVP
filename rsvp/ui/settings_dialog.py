@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 )
 
 from rsvp.core.constants import FONT_SIZE_MAX, FONT_SIZE_MIN, WPM_MAX, WPM_MIN
-from rsvp.core.settings import get_settings_manager
+from rsvp.core.settings import SettingsManager, get_settings_manager
 from rsvp.core.themes import (
     CUSTOM_THEME_SENTINEL,
     DEFAULT_THEME_NAME,
@@ -65,14 +65,16 @@ class ColorButton(QPushButton):
 class SettingsDialog(QDialog):
     """Dialog for application settings."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, settings: SettingsManager | None = None):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(450)
+        # Accept a SettingsManager via DI; fall back to the shim for legacy callers
+        self._settings = settings if settings is not None else get_settings_manager()
         self._setup_ui()
         self._load_settings()
         # Snapshot for rollback if user clicks Apply then Cancel
-        self._original_settings = asdict(get_settings_manager().settings)
+        self._original_settings = asdict(self._settings.settings)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
