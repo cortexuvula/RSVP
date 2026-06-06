@@ -5,6 +5,7 @@ is loaded into the engine: position save/restore, recent-files tracking,
 window title, status bar message, and clipboard ingestion.
 """
 
+import logging
 from collections.abc import Callable
 
 from PyQt6.QtWidgets import QFileDialog, QMessageBox, QWidget
@@ -12,6 +13,8 @@ from PyQt6.QtWidgets import QFileDialog, QMessageBox, QWidget
 from rsvp.core.rsvp_engine import RSVPEngine
 from rsvp.core.settings import get_settings_manager
 from rsvp.core.text_processor import load_text_from_file
+
+logger = logging.getLogger(__name__)
 
 FILE_DIALOG_FILTER = (
     "All Supported (*.txt *.md *.html *.htm *.epub *.pdf);;"
@@ -35,7 +38,7 @@ class DocumentLoader:
         title_setter: Callable[[str], None],
         on_loaded: Callable[[str | None], None],
         current_file_getter: Callable[[], str | None],
-    ):
+    ) -> None:
         self._parent = parent_widget
         self._engine = engine
         self._set_status = status_setter
@@ -61,7 +64,8 @@ class DocumentLoader:
         self._maybe_save_position()
         try:
             text = load_text_from_file(filepath)
-        except Exception as e:
+        except (OSError, ValueError) as e:
+            logger.exception("Failed to load file: %s", filepath)
             QMessageBox.warning(self._parent, "Error", f"Failed to load file: {e}")
             return False
 
@@ -69,6 +73,7 @@ class DocumentLoader:
         get_settings_manager().add_recent_file(filepath)
         self._set_title(f"RSVP Reader - {filepath}")
         self._set_status(f"Loaded {self._engine.word_count} words")
+        logger.info("Loaded file %s (%d words)", filepath, self._engine.word_count)
         self._on_loaded(filepath)
         self._maybe_resume_position(filepath)
         return True
@@ -97,6 +102,7 @@ class DocumentLoader:
         self._engine.load_text(text)
         self._set_title("RSVP Reader - Clipboard")
         self._set_status(f"Loaded {self._engine.word_count} words from clipboard")
+        logger.info("Loaded clipboard text (%d words)", self._engine.word_count)
         self._on_loaded(None)
         self._engine.play()
 
@@ -105,11 +111,11 @@ class DocumentLoader:
         try:
             import pyperclip
 
-            text = pyperclip.paste()
+            text: str = pyperclip.paste()
             if text:
                 return text
-        except Exception:
-            pass
+        except (ImportError, OSError) as e:
+            logger.debug("pyperclip unavailable, falling back to Qt clipboard: %s", e)
         from PyQt6.QtWidgets import QApplication
 
         return QApplication.clipboard().text()

@@ -1,5 +1,6 @@
 """Bookmark management for MainWindow."""
 
+import logging
 from collections.abc import Callable
 
 from PyQt6.QtGui import QAction
@@ -7,6 +8,8 @@ from PyQt6.QtWidgets import QMenu, QMessageBox, QWidget
 
 from rsvp.core.rsvp_engine import RSVPEngine
 from rsvp.core.settings import get_settings_manager
+
+logger = logging.getLogger(__name__)
 
 
 class BookmarkController:
@@ -19,7 +22,7 @@ class BookmarkController:
         submenu: QMenu,
         status_setter: Callable[[str], None],
         current_file_getter: Callable[[], str | None],
-    ):
+    ) -> None:
         self._parent = parent_widget
         self._engine = engine
         self._submenu = submenu
@@ -40,6 +43,7 @@ class BookmarkController:
         get_settings_manager().add_bookmark(current_file, self._engine.current_index)
         self.refresh_menu()
         self._set_status(f"Bookmark added at word {self._engine.current_index}")
+        logger.info("Bookmark added at word %d in %s", self._engine.current_index, current_file)
 
     def remove(self) -> None:
         """Remove the bookmark at the engine's current position, if any."""
@@ -57,6 +61,7 @@ class BookmarkController:
             get_settings_manager().remove_bookmark(current_file, current)
             self.refresh_menu()
             self._set_status(f"Bookmark removed at word {current}")
+            logger.info("Bookmark removed at word %d in %s", current, current_file)
         else:
             self._set_status("No bookmark at current position")
 

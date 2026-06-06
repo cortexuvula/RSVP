@@ -1,5 +1,6 @@
 """Settings dialog."""
 
+import logging
 from dataclasses import asdict
 
 from PyQt6.QtGui import QColor, QFont
@@ -19,17 +20,19 @@ from PyQt6.QtWidgets import (
 from rsvp.core.constants import FONT_SIZE_MAX, FONT_SIZE_MIN, WPM_MAX, WPM_MIN
 from rsvp.core.settings import get_settings_manager
 
+logger = logging.getLogger(__name__)
+
 
 class ColorButton(QPushButton):
     """Button that shows and allows selection of a color."""
 
-    def __init__(self, color: str, parent=None):
+    def __init__(self, color: str, parent=None) -> None:
         super().__init__(parent)
         self._color = QColor(color)
         self._update_style()
         self.clicked.connect(self._pick_color)
 
-    def _update_style(self):
+    def _update_style(self) -> None:
         self.setStyleSheet(
             f"background-color: {self._color.name()}; "
             f"color: {'white' if self._color.lightness() < 128 else 'black'}; "
@@ -37,7 +40,7 @@ class ColorButton(QPushButton):
         )
         self.setText(self._color.name())
 
-    def _pick_color(self):
+    def _pick_color(self) -> None:
         color = QColorDialog.getColor(self._color, self, "Select Color")
         if color.isValid():
             self._color = color
@@ -46,7 +49,7 @@ class ColorButton(QPushButton):
     def get_color(self) -> str:
         return self._color.name()
 
-    def set_color(self, color: str):
+    def set_color(self, color: str) -> None:
         self._color = QColor(color)
         self._update_style()
 
@@ -54,7 +57,7 @@ class ColorButton(QPushButton):
 class SettingsDialog(QDialog):
     """Dialog for application settings."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(450)
@@ -63,7 +66,7 @@ class SettingsDialog(QDialog):
         # Snapshot for rollback if user clicks Apply then Cancel
         self._original_settings = asdict(get_settings_manager().settings)
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
 
         # Display settings
@@ -129,7 +132,7 @@ class SettingsDialog(QDialog):
         button_box.button(QDialogButtonBox.StandardButton.Apply).clicked.connect(self._apply)
         layout.addWidget(button_box)
 
-    def _load_settings(self):
+    def _load_settings(self) -> None:
         """Load current settings into the dialog."""
         settings = get_settings_manager().settings
 
@@ -143,7 +146,7 @@ class SettingsDialog(QDialog):
         self.pause_paragraphs_check.setChecked(settings.pause_at_paragraphs)
         self.auto_save_check.setChecked(settings.auto_save_position)
 
-    def _apply(self):
+    def _apply(self) -> None:
         """Apply settings without closing."""
         manager = get_settings_manager()
         settings = manager.settings
@@ -159,13 +162,14 @@ class SettingsDialog(QDialog):
         settings.auto_save_position = self.auto_save_check.isChecked()
 
         manager.save()
+        logger.info("Settings applied")
 
-    def _save_and_accept(self):
+    def _save_and_accept(self) -> None:
         """Save settings and close."""
         self._apply()
         self.accept()
 
-    def reject(self):
+    def reject(self) -> None:
         """Restore original settings on cancel (undoes any Apply clicks)."""
         manager = get_settings_manager()
         for key, value in self._original_settings.items():

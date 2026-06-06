@@ -1,16 +1,20 @@
 """Word display widget with ORP highlighting."""
 
+import logging
+
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from rsvp.core.settings import get_settings_manager
 from rsvp.core.text_processor import Word
 
+logger = logging.getLogger(__name__)
+
 
 class ORPWordDisplay(QWidget):
     """Widget that displays a word with ORP (Optimal Recognition Point) highlighting."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._word: Word | None = None
         self._font = QFont("Arial", 48)
@@ -21,7 +25,7 @@ class ORPWordDisplay(QWidget):
         self.setMinimumHeight(120)
         self._load_settings()
 
-    def _load_settings(self):
+    def _load_settings(self) -> None:
         """Load display settings."""
         settings = get_settings_manager().settings
         self._font = QFont(settings.font_family, settings.font_size)
@@ -29,7 +33,7 @@ class ORPWordDisplay(QWidget):
         self._orp_color = QColor(settings.orp_color)
         self._bg_color = QColor(settings.background_color)
 
-    def update_settings(self):
+    def update_settings(self) -> None:
         """Reload settings and repaint."""
         self._load_settings()
         self.update()
@@ -39,12 +43,12 @@ class ORPWordDisplay(QWidget):
         self._word = word
         self.update()
 
-    def set_font_size(self, size: int):
+    def set_font_size(self, size: int) -> None:
         """Set the font size."""
         self._font.setPointSize(size)
         self.update()
 
-    def paintEvent(self, event):
+    def paintEvent(self, event) -> None:
         """Paint the word with ORP highlighting."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -104,11 +108,11 @@ class ORPWordDisplay(QWidget):
 class WordDisplayWidget(QWidget):
     """Complete word display widget with surrounding context."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
