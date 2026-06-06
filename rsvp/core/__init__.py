@@ -23,6 +23,7 @@ from rsvp.core.rsvp_engine import RSVPEngine, RSVPState
 from rsvp.core.settings import (
     RSVPSettings,
     SettingsManager,
+    get_settings_manager,
 )
 from rsvp.core.stats import (
     AllTimeStats,

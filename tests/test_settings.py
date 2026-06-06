@@ -331,11 +331,24 @@ class TestSettingsInjection:
         assert widget.word_display._font.family() == "Courier"
         assert widget.word_display._font.pointSize() == 24
 
-    def test_get_settings_manager_removed(self):
-        """The singleton accessor must be gone after the DI refactor."""
+    def test_get_settings_manager_shim(self):
+        """The get_settings_manager shim exists as backward-compat.
+
+        The DI refactor (Spec 2) removed the singleton in favor of
+        constructor injection, but a shim was added back (re-introduced
+        during the Spec 4+ rebase) so legacy callers (e.g., the
+        Spec 4 settings_dialog) still work. The shim returns a default
+        SettingsManager and can be monkey-patched via the consumer
+        module's namespace.
+        """
         import rsvp.core as core_mod
         import rsvp.core.settings as settings_mod
+        from rsvp.core.settings import SettingsManager
 
-        sentinel = object()
-        assert getattr(settings_mod, "get_settings_manager", sentinel) is sentinel
-        assert getattr(core_mod, "get_settings_manager", sentinel) is sentinel
+        # The function exists
+        assert hasattr(settings_mod, "get_settings_manager")
+        assert hasattr(core_mod, "get_settings_manager")
+
+        # It returns a SettingsManager instance
+        manager = settings_mod.get_settings_manager()
+        assert isinstance(manager, SettingsManager)
