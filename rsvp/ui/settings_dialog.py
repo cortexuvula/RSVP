@@ -115,6 +115,9 @@ class SettingsDialog(QDialog):
         self.auto_save_check = QCheckBox()
         behavior_layout.addRow("Remember reading position:", self.auto_save_check)
 
+        self.tts_check = QCheckBox()
+        behavior_layout.addRow("Text-to-speech:", self.tts_check)
+
         behavior_group.setLayout(behavior_layout)
         layout.addWidget(behavior_group)
 
@@ -142,6 +145,7 @@ class SettingsDialog(QDialog):
         self.always_on_top_check.setChecked(settings.always_on_top)
         self.pause_paragraphs_check.setChecked(settings.pause_at_paragraphs)
         self.auto_save_check.setChecked(settings.auto_save_position)
+        self.tts_check.setChecked(settings.tts_enabled)
 
     def _apply(self):
         """Apply settings without closing."""
@@ -157,6 +161,7 @@ class SettingsDialog(QDialog):
         settings.always_on_top = self.always_on_top_check.isChecked()
         settings.pause_at_paragraphs = self.pause_paragraphs_check.isChecked()
         settings.auto_save_position = self.auto_save_check.isChecked()
+        settings.tts_enabled = self.tts_check.isChecked()
 
         manager.save()
 

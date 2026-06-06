@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStat
 from rsvp.core.constants import WPM_MAX, WPM_MIN, WPM_STEP
 from rsvp.core.rsvp_engine import RSVPEngine
 from rsvp.core.settings import get_settings_manager
+from rsvp.core.tts import TTSController, create_tts_driver
 from rsvp.ui.bookmark_controller import BookmarkController
 from rsvp.ui.controls import PlaybackControls, ProgressWidget, SpeedControl
 from rsvp.ui.document_loader import DocumentLoader
@@ -23,6 +24,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self._current_file = None
         self._engine = RSVPEngine()
+        self._tts = TTSController(self._engine, driver=create_tts_driver())
+        self._tts.set_enabled(get_settings_manager().settings.tts_enabled)
         self._setup_ui()
         self._setup_menus()
         self._setup_controllers()
@@ -201,6 +204,7 @@ class MainWindow(QMainWindow):
         """Apply current settings to UI."""
         settings = get_settings_manager().settings
         self.word_display.update_settings()
+        self._tts.set_enabled(settings.tts_enabled)
 
         if settings.always_on_top:
             self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
@@ -396,6 +400,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close."""
+        self._tts.shutdown()
         self._documents.maybe_save_position()
         self._save_window_settings()
         self._check_settings_save_failed()
