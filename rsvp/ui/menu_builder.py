@@ -44,6 +44,16 @@ class MenuBuilder:
 
         file_menu.addSeparator()
 
+        export_action = QAction("&Export Settings...", self._window)
+        export_action.triggered.connect(host._export_settings)
+        file_menu.addAction(export_action)
+
+        import_action = QAction("&Import Settings...", self._window)
+        import_action.triggered.connect(host._import_settings)
+        file_menu.addAction(import_action)
+
+        file_menu.addSeparator()
+
         recent_menu = file_menu.addMenu("Recent Files")
 
         file_menu.addSeparator()

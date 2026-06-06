@@ -1,5 +1,10 @@
 """Main application window."""
 
+import json
+import logging
+from datetime import datetime
+from pathlib import Path
+
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStatusBar, QVBoxLayout, QWidget
@@ -7,6 +12,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStat
 from rsvp.core.constants import WPM_MAX, WPM_MIN, WPM_STEP
 from rsvp.core.rsvp_engine import RSVPEngine
 from rsvp.core.settings import get_settings_manager
+from rsvp.core.transfer import export_to_file, import_from_file
 from rsvp.ui.bookmark_controller import BookmarkController
 from rsvp.ui.controls import PlaybackControls, ProgressWidget, SpeedControl
 from rsvp.ui.document_loader import DocumentLoader
@@ -14,6 +20,8 @@ from rsvp.ui.menu_builder import MenuBuilder
 from rsvp.ui.settings_dialog import SettingsDialog
 from rsvp.ui.text_input_dialog import TextInputDialog
 from rsvp.ui.word_display import WordDisplayWidget
+
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
@@ -248,6 +256,77 @@ class MainWindow(QMainWindow):
     def _paste_and_read(self):
         """Paste from clipboard and start reading."""
         self._documents.load_from_clipboard()
+
+    def _export_settings(self) -> None:
+        """Export settings to a JSON file chosen by the user."""
+        from PyQt6.QtWidgets import QFileDialog
+
+        default_name = f"rsvp-export-{datetime.now().strftime('%Y-%m-%d')}.json"
+        path_str, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Settings",
+            default_name,
+            "JSON files (*.json);;All files (*)",
+        )
+        if not path_str:
+            return
+        path = Path(path_str)
+        try:
+            export_to_file(
+                path,
+                get_settings_manager(),
+                stats_manager=getattr(self, "_stats_manager", None),
+            )
+        except OSError as e:
+            QMessageBox.critical(self, "Export Failed", f"Could not write to {path}:\n{e}")
+            return
+        QMessageBox.information(
+            self, "Export Complete", f"Settings exported to:\n{path}"
+        )
+
+    def _import_settings(self) -> None:
+        """Import settings from a JSON file chosen by the user."""
+        from PyQt6.QtWidgets import QFileDialog
+
+        path_str, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import Settings",
+            "",
+            "JSON files (*.json);;All files (*)",
+        )
+        if not path_str:
+            return
+        path = Path(path_str)
+
+        # Confirm before overwriting
+        reply = QMessageBox.question(
+            self,
+            "Confirm Import",
+            "Importing will overwrite your current settings.\n"
+            "A backup of your current settings.json will be saved.\n\n"
+            "Continue?",
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            summary = import_from_file(
+                path,
+                get_settings_manager(),
+                stats_manager=getattr(self, "_stats_manager", None),
+            )
+        except (OSError, json.JSONDecodeError) as e:
+            QMessageBox.critical(self, "Import Failed", f"Could not read {path}:\n{e}")
+            return
+
+        # Refresh UI to reflect new settings
+        self._apply_settings()
+        self.speed_control.set_wpm(get_settings_manager().settings.wpm)
+
+        msg = f"Imported {summary['settings_applied']} settings."
+        if summary["warnings"]:
+            msg += "\n\nWarnings:\n" + "\n".join(f"  • {w}" for w in summary["warnings"])
+        QMessageBox.information(self, "Import Complete", msg)
 
     def _on_document_loaded(self, source):
         """Hook called by DocumentLoader after each successful load."""
