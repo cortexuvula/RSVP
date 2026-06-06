@@ -24,6 +24,13 @@ from rsvp.core.settings import (
     RSVPSettings,
     SettingsManager,
 )
+from rsvp.core.stats import (
+    AllTimeStats,
+    DocumentStats,
+    SessionRecord,
+    StatsData,
+    StatsManager,
+)
 from rsvp.core.text_processor import (
     Word,
     calculate_orp,
@@ -39,7 +46,9 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "ALLOWED_URL_SCHEMES",
+    "AllTimeStats",
     "DEFAULT_SKIP_WORDS",
+    "DocumentStats",
     "FONT_SIZE_MAX",
     "FONT_SIZE_MIN",
     "PAUSE_CLAUSE",
@@ -50,7 +59,10 @@ __all__ = [
     "RSVPEngine",
     "RSVPSettings",
     "RSVPState",
+    "SessionRecord",
     "SettingsManager",
+    "StatsData",
+    "StatsManager",
     "URL_FETCH_TIMEOUT_SECONDS",
     "WPM_DEFAULT",
     "WPM_MAX",
