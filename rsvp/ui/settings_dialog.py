@@ -6,6 +6,7 @@ from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QCheckBox,
     QColorDialog,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFontComboBox,
@@ -87,6 +88,10 @@ class SettingsDialog(QDialog):
         self.bg_color_btn = ColorButton("#1E1E1E")
         display_layout.addRow("Background:", self.bg_color_btn)
 
+        self.chunk_size_combo = QComboBox()
+        self.chunk_size_combo.addItems(["1 word", "2 words", "3 words"])
+        display_layout.addRow("Chunk Size:", self.chunk_size_combo)
+
         display_group.setLayout(display_layout)
         layout.addWidget(display_group)
 
@@ -138,6 +143,9 @@ class SettingsDialog(QDialog):
         self.text_color_btn.set_color(settings.text_color)
         self.orp_color_btn.set_color(settings.orp_color)
         self.bg_color_btn.set_color(settings.background_color)
+        chunk_size = getattr(settings, "chunk_size", 1)
+        idx = max(0, min(2, chunk_size - 1))  # 1->0, 2->1, 3->2
+        self.chunk_size_combo.setCurrentIndex(idx)
         self.default_wpm_spin.setValue(settings.wpm)
         self.always_on_top_check.setChecked(settings.always_on_top)
         self.pause_paragraphs_check.setChecked(settings.pause_at_paragraphs)
@@ -153,6 +161,7 @@ class SettingsDialog(QDialog):
         settings.text_color = self.text_color_btn.get_color()
         settings.orp_color = self.orp_color_btn.get_color()
         settings.background_color = self.bg_color_btn.get_color()
+        settings.chunk_size = self.chunk_size_combo.currentIndex() + 1
         settings.wpm = self.default_wpm_spin.value()
         settings.always_on_top = self.always_on_top_check.isChecked()
         settings.pause_at_paragraphs = self.pause_paragraphs_check.isChecked()
