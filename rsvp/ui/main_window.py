@@ -9,12 +9,15 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStat
 from rsvp.core.constants import WPM_MAX, WPM_MIN, WPM_STEP
 from rsvp.core.rsvp_engine import RSVPEngine
 from rsvp.core.settings import SettingsManager
+from rsvp.core.stats import StatsManager
+from rsvp.core.stats_recorder import StatsRecorder
 from rsvp.core.tts import TTSController, create_tts_driver
 from rsvp.ui.bookmark_controller import BookmarkController
 from rsvp.ui.controls import PlaybackControls, ProgressWidget, SpeedControl
 from rsvp.ui.document_loader import DocumentLoader
 from rsvp.ui.menu_builder import MenuBuilder
 from rsvp.ui.settings_dialog import SettingsDialog
+from rsvp.ui.stats_dialog import StatsDialog
 from rsvp.ui.text_input_dialog import TextInputDialog
 from rsvp.ui.word_display import WordDisplayWidget
 
@@ -29,6 +32,8 @@ class MainWindow(QMainWindow):
         self._settings = settings if settings is not None else SettingsManager()
         self._current_file: str | None = None
         self._engine = RSVPEngine(settings=self._settings)
+        self._stats_manager = StatsManager()
+        self._stats_recorder = StatsRecorder(self._engine, self._stats_manager)
         self._tts = TTSController(self._engine, driver=create_tts_driver())
         self._tts.set_enabled(self._settings.settings.tts_enabled)
         self._setup_ui()
@@ -246,7 +251,15 @@ class MainWindow(QMainWindow):
         """Show the text input dialog."""
         dialog = TextInputDialog(self)
         if dialog.exec():
-            self._documents.load_from_text_dialog(dialog.get_text(), dialog.get_source_path())
+            text = dialog.get_text()
+            source = dialog.get_source_path()
+            self._documents.load_from_text_dialog(text, source)
+            if source and source.startswith(("http://", "https://")):
+                self._stats_recorder.set_source(source, "url")
+            elif source:
+                self._stats_recorder.set_source(source, "file")
+            else:
+                self._stats_recorder.set_source(None, "paste")
 
     def _open_file(self) -> None:
         """Open a file directly."""
@@ -258,11 +271,16 @@ class MainWindow(QMainWindow):
 
     def _paste_and_read(self) -> None:
         """Paste from clipboard and start reading."""
+        self._stats_recorder.set_source(None, "clipboard")
         self._documents.load_from_clipboard()
 
     def _on_document_loaded(self, source: str | None) -> None:
         """Hook called by DocumentLoader after each successful load."""
         self._current_file = source
+        if source and source.startswith(("http://", "https://")):
+            self._stats_recorder.set_source(source, "url")
+        else:
+            self._stats_recorder.set_source(source, "file")
         self._update_recent_menu()
         self._bookmarks.refresh_menu()
 
@@ -356,6 +374,11 @@ class MainWindow(QMainWindow):
             "Point (ORP) highlighted, allowing for faster reading speeds.</p>",
         )
 
+    def _show_statistics(self):
+        """Show the reading statistics dialog."""
+        dialog = StatsDialog(self, stats_manager=self._stats_manager)
+        dialog.exec()
+
     # ------------------------------------------------------------------
     # Signal handlers
     # ------------------------------------------------------------------
@@ -407,6 +430,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         """Handle window close."""
+        self._stats_recorder.shutdown()
         self._tts.shutdown()
         self._documents.maybe_save_position()
         self._save_window_settings()
