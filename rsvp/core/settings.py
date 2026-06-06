@@ -26,6 +26,7 @@ class RSVPSettings:
     # Behavior settings
     pause_at_paragraphs: bool = True
     auto_save_position: bool = True
+    tts_enabled: bool = False
 
     # Window settings
     window_width: int = 800
