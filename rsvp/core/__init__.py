@@ -85,6 +85,8 @@ __all__ = [
     "StatsManager",
     "THEME_NAMES",
     "THEMES",
+    "TTSController",
+    "TTSDriver",
     "Theme",
     "TTSController",
     "TTSDriver",
