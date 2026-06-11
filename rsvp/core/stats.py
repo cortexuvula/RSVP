@@ -3,11 +3,12 @@
 import json
 import logging
 import os
-import platform
 import shutil
-from dataclasses import asdict, dataclass, field
+import tempfile
+from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime
-from pathlib import Path
+
+from rsvp.core.config import get_config_dir
 
 logger = logging.getLogger(__name__)
 
@@ -69,26 +70,14 @@ class StatsManager:
 
     def __init__(self) -> None:
         self._data = StatsData()
-        self._config_path = self._get_config_path()
+        self._config_path = get_config_dir() / "stats.json"
         self._was_reset = False
+        self._save_failed = False
         self.load()
 
     @property
     def data(self) -> StatsData:
         return self._data
-
-    def _get_config_path(self) -> Path:
-        """Get the path to the stats file."""
-        system = platform.system()
-        if system == "Windows":
-            base = Path.home() / "AppData" / "Local" / "RSVP"
-        elif system == "Darwin":
-            base = Path.home() / "Library" / "Application Support" / "RSVP"
-        else:
-            xdg_config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-            base = xdg_config / "rsvp"
-        base.mkdir(parents=True, exist_ok=True)
-        return base / "stats.json"
 
     def load(self) -> None:
         """Load stats from file. Resets to defaults on corruption."""
@@ -109,17 +98,35 @@ class StatsManager:
             self._was_reset = True
 
     def save(self) -> None:
-        """Persist stats to disk."""
+        """Persist stats to disk atomically.
+
+        Writes to a temp file first, then uses os.replace() for an atomic
+        rename so that a crash mid-write never leaves a truncated file.
+        """
+        config_dir = self._config_path.parent
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=config_dir, suffix=".tmp")
         try:
-            with open(self._config_path, "w", encoding="utf-8") as f:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
                 json.dump(self._to_dict(self._data), f, indent=2)
+            os.replace(tmp_path, self._config_path)
         except OSError as e:
+            self._save_failed = True
             logger.warning("Failed to save stats to %s: %s", self._config_path, e)
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
     def was_reset(self) -> bool:
         """Check if stats were reset due to corruption. Clears the flag after reading."""
         result = self._was_reset
         self._was_reset = False
+        return result
+
+    def save_failed(self) -> bool:
+        """Check if the last save attempt failed. Clears the flag after reading."""
+        result = self._save_failed
+        self._save_failed = False
         return result
 
     def reset(self) -> None:
@@ -175,22 +182,30 @@ class StatsManager:
 
     @staticmethod
     def _from_dict(raw: dict) -> StatsData:
-        all_time = AllTimeStats(**raw.get("all_time", {}))
-        per_document = {
-            src: DocumentStats(
-                **{k: v for k, v in d.items() if k != "last_read"},
-                last_read=datetime.fromisoformat(d["last_read"]),
-            )
-            for src, d in raw.get("per_document", {}).items()
-        }
-        recent = [
-            SessionRecord(
-                **{k: v for k, v in s.items() if k not in ("started_at", "ended_at")},
-                started_at=datetime.fromisoformat(s["started_at"]),
-                ended_at=datetime.fromisoformat(s["ended_at"]),
-            )
-            for s in raw.get("recent_sessions", [])
-        ]
+        # Validate AllTimeStats keys against its dataclass fields
+        all_time_valid = {f.name for f in fields(AllTimeStats)}
+        all_time_filtered = {k: v for k, v in raw.get("all_time", {}).items() if k in all_time_valid}
+        all_time = AllTimeStats(**all_time_filtered)
+
+        # Validate DocumentStats keys
+        doc_valid = {f.name for f in fields(DocumentStats)}
+        per_document = {}
+        for src, d in raw.get("per_document", {}).items():
+            filtered = {k: v for k, v in d.items() if k in doc_valid and k != "last_read"}
+            filtered["last_read"] = datetime.fromisoformat(d["last_read"])
+            per_document[src] = DocumentStats(**filtered)
+
+        # Validate SessionRecord keys
+        session_valid = {f.name for f in fields(SessionRecord)}
+        recent = []
+        for s in raw.get("recent_sessions", []):
+            filtered = {
+                k: v for k, v in s.items() if k in session_valid and k not in ("started_at", "ended_at")
+            }
+            filtered["started_at"] = datetime.fromisoformat(s["started_at"])
+            filtered["ended_at"] = datetime.fromisoformat(s["ended_at"])
+            recent.append(SessionRecord(**filtered))
+
         return StatsData(
             all_time=all_time,
             per_document=per_document,

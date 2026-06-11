@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 )
 
 from rsvp.core.constants import FONT_SIZE_MAX, FONT_SIZE_MIN, WPM_MAX, WPM_MIN
-from rsvp.core.settings import SettingsManager, get_settings_manager
+from rsvp.core.settings import SettingsManager
 from rsvp.core.themes import (
     CUSTOM_THEME_SENTINEL,
     DEFAULT_THEME_NAME,
@@ -65,17 +65,16 @@ class ColorButton(QPushButton):
 class SettingsDialog(QDialog):
     """Dialog for application settings."""
 
-    def __init__(self, parent=None, settings: SettingsManager | None = None) -> None:
+    def __init__(self, parent=None, *, settings: SettingsManager) -> None:
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(450)
-        # Accept a SettingsManager via DI; fall back to the shim so legacy callers
-        # (and the isolated_settings test fixture) keep working
-        self._settings = settings if settings is not None else get_settings_manager()
+        self._settings = settings
         self._setup_ui()
         self._load_settings()
         # Snapshot for rollback if user clicks Apply then Cancel
         self._original_settings = asdict(self._settings.settings)
+        self._dirty = False  # tracks whether Apply has been clicked
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -258,6 +257,7 @@ class SettingsDialog(QDialog):
 
         self._settings.save()
         logger.info("Settings applied")
+        self._dirty = True
 
     def _save_and_accept(self):
         """Save settings and close."""
@@ -269,5 +269,8 @@ class SettingsDialog(QDialog):
         for key, value in self._original_settings.items():
             if hasattr(self._settings.settings, key):
                 setattr(self._settings.settings, key, value)
-        self._settings.save()
+        # Only persist the rollback if the user had actually applied changes;
+        # otherwise the on-disk file already holds the correct values.
+        if self._dirty:
+            self._settings.save()
         super().reject()

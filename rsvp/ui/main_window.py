@@ -276,7 +276,7 @@ class MainWindow(QMainWindow):
 
     def _show_settings(self) -> None:
         """Show the settings dialog."""
-        dialog = SettingsDialog(self)
+        dialog = SettingsDialog(self, settings=self._settings)
         if dialog.exec():
             self._apply_settings()
             self.speed_control.set_wpm(self._settings.settings.wpm)

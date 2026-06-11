@@ -26,3 +26,14 @@ URL_FETCH_TIMEOUT_SECONDS = 10
 
 # Preview length when loading from file/URL in the text input dialog
 PREVIEW_MAX_CHARS = 5000
+
+# File dialog filter for open-file dialogs
+FILE_DIALOG_FILTER = (
+    "All Supported (*.txt *.md *.html *.htm *.epub *.pdf);;"
+    "Text (*.txt);;"
+    "Markdown (*.md);;"
+    "HTML (*.html *.htm);;"
+    "EPUB (*.epub);;"
+    "PDF (*.pdf);;"
+    "All Files (*)"
+)

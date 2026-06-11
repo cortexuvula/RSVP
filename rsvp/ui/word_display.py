@@ -41,7 +41,7 @@ class ORPWordDisplay(QWidget):
         self._load_settings()
         self.update()
 
-    def set_word(self, word: Word | None):
+    def set_word(self, word: Word | None) -> None:
         """Set the word to display."""
         self._word = word
         self.update()
@@ -126,10 +126,10 @@ class WordDisplayWidget(QWidget):
 
         self.setLayout(layout)
 
-    def set_word(self, word: Word | None):
+    def set_word(self, word: Word | None) -> None:
         """Set the word to display."""
         self.word_display.set_word(word)
 
-    def update_settings(self):
+    def update_settings(self) -> None:
         """Update display settings."""
         self.word_display.update_settings()

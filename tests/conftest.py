@@ -2,6 +2,8 @@
 
 import pytest
 
+from rsvp.core.rsvp_engine import RSVPEngine
+
 
 @pytest.fixture(scope="session")
 def qapp():
@@ -12,3 +14,12 @@ def qapp():
     if app is None:
         app = QApplication([])
     yield app
+
+
+def force_playing(engine: RSVPEngine) -> None:
+    """Force the engine into a 'playing' internal state for unit tests.
+
+    This centralises the coupling to ``_state.is_playing`` so that tests
+    don't reach into the private attribute independently.
+    """
+    engine._state.is_playing = True

@@ -1,5 +1,6 @@
 """Tests for the TTS module."""
 
+import threading
 from unittest.mock import MagicMock
 
 from rsvp.core.rsvp_engine import RSVPEngine
@@ -49,12 +50,14 @@ class TestTTSController:
         engine = RSVPEngine()
         ctrl = TTSController(engine, driver=NullDriver())
         assert ctrl.enabled is False
+        ctrl.shutdown()
 
     def test_set_enabled_true(self, qapp):
         engine = RSVPEngine()
         ctrl = TTSController(engine, driver=NullDriver())
         ctrl.set_enabled(True)
         assert ctrl.enabled is True
+        ctrl.shutdown()
 
     def test_set_enabled_false_calls_stop(self, qapp):
         engine = RSVPEngine()
@@ -63,28 +66,43 @@ class TestTTSController:
         ctrl.set_enabled(True)
         mock_driver.reset_mock()
         ctrl.set_enabled(False)
+        # Process events so the queued _stop_requested signal reaches the worker thread
+        qapp.processEvents()
         mock_driver.stop.assert_called()
+        ctrl.shutdown()
 
     def test_word_changed_with_null_driver_does_nothing(self, qapp):
         engine = RSVPEngine()
         # Constructing the controller subscribes it to engine signals;
         # the only check is that emitting a word doesn't raise.
-        ctrl = TTSController(engine, driver=NullDriver())  # noqa: F841
+        ctrl = TTSController(engine, driver=NullDriver())
         assert ctrl is not None
         # Should not raise even when a word is emitted
         engine.word_changed.emit(Word(text="hello", orp_index=0, pause_after=1.0))
+        ctrl.shutdown()
 
     def test_word_changed_speaks_when_enabled(self, qapp):
         engine = RSVPEngine()
         mock_driver = MagicMock()
         ctrl = TTSController(engine, driver=mock_driver)
         ctrl.set_enabled(True)
-        # Keep ctrl alive (Qt signal connection would be GC'd otherwise)
         assert ctrl.enabled
         mock_driver.reset_mock()
+
+        # Use an event to wait for the worker thread to complete
+        speak_done = threading.Event()
+        original_run_and_wait = mock_driver.run_and_wait
+
+        def tracking_run_and_wait():
+            original_run_and_wait()
+            speak_done.set()
+
+        mock_driver.run_and_wait = tracking_run_and_wait
+
         engine.word_changed.emit(Word(text="hello", orp_index=0, pause_after=1.0))
+        assert speak_done.wait(timeout=2.0), "TTS worker did not speak in time"
         mock_driver.say.assert_called_once_with("hello")
-        mock_driver.run_and_wait.assert_called_once()
+        ctrl.shutdown()
 
     def test_pause_calls_driver_stop(self, qapp):
         engine = RSVPEngine()
@@ -96,7 +114,10 @@ class TestTTSController:
         mock_driver.reset_mock()
         engine.play()
         engine.pause()
+        # Process events so the queued _stop_requested signal reaches the worker thread
+        qapp.processEvents()
         mock_driver.stop.assert_called()
+        ctrl.shutdown()
 
     def test_pause_does_not_call_stop_when_disabled(self, qapp):
         engine = RSVPEngine()
@@ -107,6 +128,7 @@ class TestTTSController:
         engine.play()
         engine.pause()
         mock_driver.stop.assert_not_called()
+        ctrl.shutdown()
 
     def test_shutdown_calls_driver_stop(self, qapp):
         engine = RSVPEngine()
@@ -116,6 +138,8 @@ class TestTTSController:
         assert ctrl.enabled
         mock_driver.reset_mock()
         ctrl.shutdown()
+        # shutdown() calls _stop_requested.emit() (queued) then thread.quit()+wait()
+        # The wait() should ensure the worker processes the stop signal
         mock_driver.stop.assert_called()
 
 

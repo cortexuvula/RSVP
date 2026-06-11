@@ -275,19 +275,19 @@ class TestSettingsSaveFailure:
         return mgr
 
     def test_save_failure_logs_warning(self, manager, caplog):
-        with patch("builtins.open", side_effect=OSError("disk full")):
+        with patch("os.replace", side_effect=OSError("disk full")):
             with caplog.at_level("WARNING", logger="rsvp.core.settings"):
                 manager.save()
         message = " ".join(r.getMessage() for r in caplog.records).lower()
         assert "failed to save" in message or "disk full" in message
 
     def test_save_failure_sets_flag(self, manager):
-        with patch("builtins.open", side_effect=OSError("disk full")):
+        with patch("os.replace", side_effect=OSError("disk full")):
             manager.save()
         assert manager.save_failed() is True
 
     def test_save_failed_clears_after_read(self, manager):
-        with patch("builtins.open", side_effect=OSError("disk full")):
+        with patch("os.replace", side_effect=OSError("disk full")):
             manager.save()
         assert manager.save_failed() is True
         assert manager.save_failed() is False

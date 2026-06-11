@@ -2,8 +2,7 @@
 
 import logging
 
-import requests
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -18,10 +17,30 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from rsvp.core.constants import PREVIEW_MAX_CHARS
+from rsvp.core.constants import FILE_DIALOG_FILTER, PREVIEW_MAX_CHARS
 from rsvp.core.text_processor import fetch_text_from_url, load_text_from_file
 
 logger = logging.getLogger(__name__)
+
+
+class _FetchWorker(QObject):
+    """Worker that fetches URL text on a background thread."""
+
+    finished = pyqtSignal(str)
+    error = pyqtSignal(str)
+
+    def __init__(self, url: str, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self._url = url
+
+    @pyqtSlot()
+    def run(self) -> None:
+        """Fetch text from the URL. Runs in the worker thread."""
+        try:
+            text = fetch_text_from_url(self._url)
+            self.finished.emit(text)
+        except Exception as e:
+            self.error.emit(str(e))
 
 
 class TextInputDialog(QDialog):
@@ -34,6 +53,9 @@ class TextInputDialog(QDialog):
         self._text: str = ""
         self._source_path: str | None = None
         self._url_text_truncated: bool = False
+        self._fetch_thread: QThread | None = None
+        self._fetch_worker: _FetchWorker | None = None
+        self._fetched_full_text: str | None = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -150,13 +172,7 @@ class TextInputDialog(QDialog):
             self,
             "Open File",
             "",
-            "All Supported (*.txt *.md *.html *.htm *.epub *.pdf);;"
-            "Text (*.txt);;"
-            "Markdown (*.md);;"
-            "HTML (*.html *.htm);;"
-            "EPUB (*.epub);;"
-            "PDF (*.pdf);;"
-            "All Files (*)",
+            FILE_DIALOG_FILTER,
         )
 
         if filepath:
@@ -175,23 +191,59 @@ class TextInputDialog(QDialog):
         url = self.url_edit.text().strip()
         if not url:
             return
+        # Guard against concurrent fetches (e.g. keyboard shortcut while
+        # a background fetch is already in progress).
+        if self._fetch_thread is not None:
+            return
 
-        from PyQt6.QtWidgets import QApplication
+        # Disable the fetch button while working
+        self._set_fetch_enabled(False)
 
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            text = fetch_text_from_url(url)
-            self._url_text_truncated = len(text) > PREVIEW_MAX_CHARS
-            self.url_preview.setPlainText(
-                text[:PREVIEW_MAX_CHARS] + ("..." if self._url_text_truncated else "")
-            )
-            self._source_path = url
-            logger.info("Fetched URL %s (%d chars)", url, len(text))
-        except (requests.RequestException, ValueError) as e:
-            logger.exception("Failed to fetch URL: %s", url)
-            QMessageBox.warning(self, "Error", f"Failed to fetch URL: {e}")
-        finally:
-            QApplication.restoreOverrideCursor()
+        self._fetch_thread = QThread()
+        self._fetch_worker = _FetchWorker(url)
+        self._fetch_worker.moveToThread(self._fetch_thread)
+        self._fetch_worker.finished.connect(self._on_fetch_finished)
+        self._fetch_worker.error.connect(self._on_fetch_error)
+        self._fetch_thread.started.connect(self._fetch_worker.run)
+        self._fetch_thread.finished.connect(self._cleanup_fetch_thread)
+        self._fetch_thread.start()
+
+    def _set_fetch_enabled(self, enabled: bool) -> None:
+        """Enable or disable fetch-related UI controls."""
+        # Find the Fetch button in the URL tab
+        for btn in self.url_edit.parentWidget().findChildren(QPushButton):
+            if btn.text() == "Fetch":
+                btn.setEnabled(enabled)
+                break
+
+    @pyqtSlot(str)
+    def _on_fetch_finished(self, text: str) -> None:
+        """Handle successful URL fetch."""
+        self._fetched_full_text = text
+        self._url_text_truncated = len(text) > PREVIEW_MAX_CHARS
+        self.url_preview.setPlainText(text[:PREVIEW_MAX_CHARS] + ("..." if self._url_text_truncated else ""))
+        url = self.url_edit.text().strip()
+        self._source_path = url
+        logger.info("Fetched URL %s (%d chars)", url, len(text))
+        self._set_fetch_enabled(True)
+        self._cleanup_fetch_thread()
+
+    @pyqtSlot(str)
+    def _on_fetch_error(self, error_msg: str) -> None:
+        """Handle URL fetch error."""
+        url = self.url_edit.text().strip()
+        logger.error("Failed to fetch URL: %s — %s", url, error_msg)
+        QMessageBox.warning(self, "Error", f"Failed to fetch URL: {error_msg}")
+        self._set_fetch_enabled(True)
+        self._cleanup_fetch_thread()
+
+    def _cleanup_fetch_thread(self) -> None:
+        """Tear down the fetch worker thread."""
+        if self._fetch_thread is not None:
+            self._fetch_thread.quit()
+            self._fetch_thread.wait()
+            self._fetch_thread = None
+            self._fetch_worker = None
 
     def _accept(self) -> None:
         """Accept the dialog and set the text."""
@@ -212,13 +264,17 @@ class TextInputDialog(QDialog):
                 self._text = ""
         else:  # URL
             if self._url_text_truncated:
-                # Preview was truncated, fetch full text
-                try:
-                    self._text = fetch_text_from_url(self.url_edit.text().strip())
-                except (requests.RequestException, ValueError) as e:
-                    logger.exception("Failed to fetch URL: %s", self.url_edit.text().strip())
-                    QMessageBox.warning(self, "Error", f"Failed to fetch URL: {e}")
-                    return
+                # Use the cached full text from the background fetch
+                if self._fetched_full_text is not None:
+                    self._text = self._fetched_full_text
+                else:
+                    # Fallback: re-fetch synchronously (should not normally happen)
+                    try:
+                        self._text = fetch_text_from_url(self.url_edit.text().strip())
+                    except (OSError, ValueError) as e:
+                        logger.exception("Failed to fetch URL: %s", self.url_edit.text().strip())
+                        QMessageBox.warning(self, "Error", f"Failed to fetch URL: {e}")
+                        return
             else:
                 self._text = self.url_preview.toPlainText()
 

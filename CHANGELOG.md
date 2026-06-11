@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-06-11
+
+### Added
+- SSRF protection in URL fetching: DNS-resolved IPs are checked against private/reserved ranges (loopback, RFC 1918, link-local, CG-NAT, IETF assignments, IPv6-mapped IPv4)
+- Atomic file writes for settings and stats via `tempfile.mkstemp()` + `os.replace()` — prevents corruption from mid-write crashes
+- Shared config directory helper (`rsvp/core/config.py`) used by both `SettingsManager` and `StatsManager`
+- `MenuHost(Protocol)` in menu_builder.py — explicit interface contract for the host object
+- New test files: `test_document_loader.py`, `test_text_input_dialog.py`
+- CRLF line ending normalization in `process_text()` for cross-platform text handling
+- UTF-8 fallback with `errors="replace"` for non-UTF-8 files
+- `_read_file_with_fallback()` encoding test coverage
+- `force_playing()` test helper in conftest.py to centralize private-state coupling
+
+### Changed
+- TTS playback now runs on a dedicated QThread — UI stays responsive during speech
+- URL fetching in TextInputDialog runs on a background QThread instead of blocking the UI
+- TTS stop/dispatch routes through worker thread signals for thread safety
+- Settings and stats `save()` no longer re-raise OSError — errors are logged and flagged instead
+- `SettingsDialog` requires explicit `settings=` parameter (no more singleton fallback)
+- `calculate_orp()` uses proportional formula `min(length // 3, 4)` instead of hardcoded if/elif
+- `strip_markdown()` strips all formatting characters (`*_~``) instead of greedy regex matching
+- `SettingsDialog.reject()` only saves to disk if settings were actually modified
+- IPv4-mapped IPv6 addresses (e.g. `::ffff:127.0.0.1`) are now checked against IPv4 reserved ranges
+- `FILE_DIALOG_FILTER` extracted to shared constant in `rsvp/core/constants.py`
+- Type annotations added to UI widget methods in controls.py and word_display.py
+
+### Fixed
+- Duplicate logger initialization in `bookmark_controller.py`
+- Duplicate entries in `rsvp/core/__init__.py` `__all__` list
+- Stats recorder now correctly sets `finished=True` when reading reaches the last word
+- TextInputDialog caches fetched text to avoid redundant synchronous re-fetch on accept
+- Concurrent fetch guard prevents multiple simultaneous URL fetches in TextInputDialog
+
 ## [1.4.0] - 2026-06-06
 
 ### Added

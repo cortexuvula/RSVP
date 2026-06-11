@@ -11,8 +11,6 @@ from rsvp.core.settings import SettingsManager
 
 logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
-
 
 class BookmarkController:
     """Encapsulates bookmark add/remove and Go-to-Bookmark menu population."""

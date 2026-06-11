@@ -88,8 +88,6 @@ __all__ = [
     "TTSController",
     "TTSDriver",
     "Theme",
-    "TTSController",
-    "TTSDriver",
     "URL_FETCH_TIMEOUT_SECONDS",
     "WPM_DEFAULT",
     "WPM_MAX",

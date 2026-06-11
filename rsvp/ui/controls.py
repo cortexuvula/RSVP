@@ -98,7 +98,7 @@ class PlaybackControls(QWidget):
         else:
             self.play_clicked.emit()
 
-    def set_playing(self, is_playing: bool):
+    def set_playing(self, is_playing: bool) -> None:
         """Update the play/pause button state."""
         self._is_playing = is_playing
         style = self.style()
@@ -113,11 +113,11 @@ class SpeedControl(QWidget):
 
     wpm_changed = pyqtSignal(int)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 5, 10, 5)
 
@@ -203,11 +203,11 @@ class ProgressWidget(QWidget):
 
     seek_requested = pyqtSignal(float)  # Emits percentage 0-100
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 5, 10, 5)
 
@@ -233,7 +233,9 @@ class ProgressWidget(QWidget):
         percent = (self.slider.value() / 1000) * 100
         self.seek_requested.emit(percent)
 
-    def update_progress(self, progress_percent: float, current: int, total: int, time_remaining: float):
+    def update_progress(
+        self, progress_percent: float, current: int, total: int, time_remaining: float
+    ) -> None:
         """Update the progress display."""
         self.slider.blockSignals(True)
         self.slider.setValue(int((progress_percent / 100) * 1000))

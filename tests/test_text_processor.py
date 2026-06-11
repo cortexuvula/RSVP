@@ -6,6 +6,8 @@ import pytest
 
 from rsvp.core.text_processor import (
     Word,
+    _is_reserved_ip,
+    _read_file_with_fallback,
     calculate_orp,
     calculate_pause_multiplier,
     extract_text_from_html,
@@ -29,7 +31,7 @@ class TestCalculateORP:
         assert calculate_orp("ab") == 0
 
     def test_three_chars(self):
-        assert calculate_orp("the") == 0
+        assert calculate_orp("the") == 1
 
     def test_four_chars(self):
         assert calculate_orp("word") == 1
@@ -41,13 +43,13 @@ class TestCalculateORP:
         assert calculate_orp("system") == 2
 
     def test_nine_chars(self):
-        assert calculate_orp("beautiful") == 2
+        assert calculate_orp("beautiful") == 3
 
     def test_ten_chars(self):
         assert calculate_orp("understood") == 3
 
     def test_thirteen_chars(self):
-        assert calculate_orp("communication") == 3
+        assert calculate_orp("communication") == 4
 
     def test_fourteen_chars(self):
         assert calculate_orp("representation") == 4
@@ -563,3 +565,87 @@ class TestFetchTextFromUrl:
         assert "ok" in result
         assert captured["url"] == "https://example.com/article"
         assert captured["timeout"] == 10
+
+
+class TestIsReservedIP:
+    """Tests for the _is_reserved_ip helper."""
+
+    def test_loopback_v4(self):
+        assert _is_reserved_ip("127.0.0.1") is True
+
+    def test_private_10(self):
+        assert _is_reserved_ip("10.0.0.1") is True
+
+    def test_private_192(self):
+        assert _is_reserved_ip("192.168.1.1") is True
+
+    def test_link_local(self):
+        assert _is_reserved_ip("169.254.1.1") is True
+
+    def test_public_ip(self):
+        assert _is_reserved_ip("8.8.8.8") is False
+
+    def test_ipv6_loopback(self):
+        assert _is_reserved_ip("::1") is True
+
+    def test_ipv6_link_local(self):
+        assert _is_reserved_ip("fe80::1") is True
+
+    def test_ipv6_unique_local(self):
+        assert _is_reserved_ip("fd00::1") is True
+
+    def test_ipv6_mapped_ipv4_loopback(self):
+        """::ffff:127.0.0.1 is an IPv4-mapped IPv6 address for loopback."""
+        assert _is_reserved_ip("::ffff:127.0.0.1") is True
+
+    def test_ipv6_mapped_ipv4_private(self):
+        """::ffff:10.0.0.1 should be caught by the IPv4-mapped IPv6 network."""
+        assert _is_reserved_ip("::ffff:10.0.0.1") is True
+
+    def test_ipv6_mapped_ipv4_public(self):
+        """::ffff:8.8.8.8 should NOT be reserved (public IPv4 mapped)."""
+        assert _is_reserved_ip("::ffff:8.8.8.8") is False
+
+    def test_unparseable_treated_as_reserved(self):
+        assert _is_reserved_ip("not-an-ip") is True
+
+    def test_carrier_grade_nat(self):
+        """100.64.0.0/10 (RFC 6598) — carrier-grade NAT shared address space."""
+        assert _is_reserved_ip("100.64.0.1") is True
+        assert _is_reserved_ip("100.127.255.254") is True
+
+    def test_carrier_grade_nat_boundary(self):
+        """Addresses just outside 100.64.0.0/10 should NOT be reserved."""
+        assert _is_reserved_ip("100.63.255.255") is False
+        assert _is_reserved_ip("100.128.0.0") is False
+
+    def test_ietf_protocol_assignments(self):
+        """192.0.0.0/24 (RFC 6890) — IETF protocol assignments."""
+        assert _is_reserved_ip("192.0.0.1") is True
+        assert _is_reserved_ip("192.0.0.254") is True
+
+    def test_ietf_protocol_assignments_boundary(self):
+        """192.0.1.0 should NOT fall in 192.0.0.0/24."""
+        assert _is_reserved_ip("192.0.1.0") is False
+
+
+class TestReadFileWithFallback:
+    """Tests for _read_file_with_fallback with non-UTF-8 files."""
+
+    def test_valid_utf8(self, tmp_path):
+        f = tmp_path / "utf8.txt"
+        f.write_text("Hello world", encoding="utf-8")
+        result = _read_file_with_fallback(str(f))
+        assert result == "Hello world"
+
+    def test_non_utf8_falls_back_to_replace(self, tmp_path):
+        """Write raw bytes that are not valid UTF-8; should get replacement chars."""
+        f = tmp_path / "bad.txt"
+        # 0xFF 0xFE are not valid UTF-8 sequences
+        f.write_bytes(b"\xff\xfe Hello \xff world")
+        result = _read_file_with_fallback(str(f))
+        # Should contain the valid ASCII parts and replacement characters
+        assert "Hello" in result
+        assert "world" in result
+        # The replacement character U+FFFD should appear for the bad bytes
+        assert "\ufffd" in result

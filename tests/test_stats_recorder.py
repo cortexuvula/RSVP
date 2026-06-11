@@ -186,3 +186,43 @@ class TestSignalWiring:
         recorder._session_start = datetime.now() - timedelta(seconds=30)
         engine.finished.emit()
         assert stats_manager.data.recent_sessions[0].finished is True
+
+
+class TestFinishedFlagOnLastWord:
+    """Verify that sessions ending by reaching the last word are marked finished.
+
+    Simulates the real _advance() behaviour: pause() fires before
+    finished.emit() due to synchronous same-thread signal delivery.
+    """
+
+    def test_pause_then_finished_marks_session_finished(self, engine_and_recorder):
+        """Replicate the exact signal order from RSVPEngine._advance()."""
+        engine, recorder, stats_manager = engine_and_recorder
+        engine.load_text("one two three four five")
+        recorder.set_source("/a.txt", "file")
+        engine._state.wpm = 300
+        engine.play()
+        # Simulate reading several words
+        for i in range(5):
+            engine.word_changed.emit(Word(text=f"w{i}", orp_index=0, pause_after=1.0))
+        # Backdate session start so the duration guard passes
+        recorder._session_start = datetime.now() - timedelta(seconds=30)
+        # Replicate _advance()'s signal order: pause() then finished.emit()
+        engine.pause()  # → state_changed → _on_state_changed → _end_session (finished=False)
+        engine.finished.emit()  # → _on_finished → patches finished=True
+        assert stats_manager.data.all_time.sessions_count == 1
+        assert stats_manager.data.recent_sessions[0].finished is True
+
+    def test_user_pause_not_marked_finished(self, engine_and_recorder):
+        """A manual pause (no finished signal) should leave finished=False."""
+        engine, recorder, stats_manager = engine_and_recorder
+        engine.load_text("one two three four five")
+        recorder.set_source("/a.txt", "file")
+        engine._state.wpm = 300
+        engine.play()
+        for i in range(3):
+            engine.word_changed.emit(Word(text=f"w{i}", orp_index=0, pause_after=1.0))
+        recorder._session_start = datetime.now() - timedelta(seconds=30)
+        engine.pause()  # user pauses mid-read, no finished signal
+        assert stats_manager.data.all_time.sessions_count == 1
+        assert stats_manager.data.recent_sessions[0].finished is False

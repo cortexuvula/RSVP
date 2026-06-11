@@ -237,7 +237,11 @@ class RSVPEngine(QObject):
         current = self._state.current_word
         if current:
             interval = base_interval * current.pause_after
-            if current.paragraph_break_after and self._settings is not None and self._settings.settings.pause_at_paragraphs:
+            if (
+                current.paragraph_break_after
+                and self._settings is not None
+                and self._settings.settings.pause_at_paragraphs
+            ):
                 interval *= PAUSE_PARAGRAPH
         else:
             interval = base_interval
