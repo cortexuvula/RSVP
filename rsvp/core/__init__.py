@@ -50,6 +50,13 @@ from rsvp.core.themes import (
     Theme,
     get_theme,
 )
+from rsvp.core.tts import (
+    NullDriver,
+    Pyttsx3Driver,
+    TTSController,
+    TTSDriver,
+    create_tts_driver,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +69,12 @@ __all__ = [
     "DocumentStats",
     "FONT_SIZE_MAX",
     "FONT_SIZE_MIN",
+    "NullDriver",
     "PAUSE_CLAUSE",
     "PAUSE_PARAGRAPH",
     "PAUSE_SENTENCE",
     "PAUSE_TRAILING_PUNCTUATION",
+    "Pyttsx3Driver",
     "PREVIEW_MAX_CHARS",
     "RSVPEngine",
     "RSVPSettings",
@@ -76,6 +85,8 @@ __all__ = [
     "StatsManager",
     "THEME_NAMES",
     "THEMES",
+    "TTSController",
+    "TTSDriver",
     "Theme",
     "URL_FETCH_TIMEOUT_SECONDS",
     "WPM_DEFAULT",
@@ -86,6 +97,7 @@ __all__ = [
     "Word",
     "calculate_orp",
     "calculate_pause_multiplier",
+    "create_tts_driver",
     "extract_text_from_html",
     "fetch_text_from_url",
     "get_settings_manager",

@@ -3,11 +3,11 @@
 import json
 import logging
 import os
-import platform
 import shutil
+import tempfile
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
 
+from rsvp.core.config import get_config_dir
 from rsvp.core.themes import DEFAULT_THEME_NAME
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,7 @@ class RSVPSettings:
     # Behavior settings
     pause_at_paragraphs: bool = True
     auto_save_position: bool = True
+    tts_enabled: bool = False
 
     # Window settings
     window_width: int = 800
@@ -57,23 +58,8 @@ class SettingsManager:
         self._settings = RSVPSettings()
         self._settings_were_reset = False
         self._save_failed = False
-        self._config_path = self._get_config_path()
+        self._config_path = get_config_dir() / "settings.json"
         self.load()
-
-    def _get_config_path(self) -> Path:
-        """Get the path to the config file."""
-        system = platform.system()
-
-        if system == "Windows":
-            base = Path.home() / "AppData" / "Local" / "RSVP"
-        elif system == "Darwin":  # macOS
-            base = Path.home() / "Library" / "Application Support" / "RSVP"
-        else:  # Linux and others
-            xdg_config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-            base = xdg_config / "rsvp"
-
-        base.mkdir(parents=True, exist_ok=True)
-        return base / "settings.json"
 
     @property
     def settings(self) -> RSVPSettings:
@@ -115,13 +101,24 @@ class SettingsManager:
         return result
 
     def save(self) -> None:
-        """Save settings to file. Logs a warning and sets save_failed flag on IOError."""
+        """Save settings to file atomically.
+
+        Writes to a temp file first, then uses os.replace() for an atomic
+        rename so that a crash mid-write never leaves a truncated file.
+        """
+        config_dir = self._config_path.parent
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=config_dir, suffix=".tmp")
         try:
-            with open(self._config_path, "w", encoding="utf-8") as f:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
                 json.dump(asdict(self._settings), f, indent=2)
+            os.replace(tmp_path, self._config_path)
         except OSError as e:
             self._save_failed = True
             logger.warning("Failed to save settings to %s: %s", self._config_path, e)
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
     def add_recent_file(self, filepath: str) -> None:
         """Add a file to the recent files list."""

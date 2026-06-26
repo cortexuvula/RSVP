@@ -10,21 +10,12 @@ from collections.abc import Callable
 
 from PyQt6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
+from rsvp.core.constants import FILE_DIALOG_FILTER
 from rsvp.core.rsvp_engine import RSVPEngine
 from rsvp.core.settings import SettingsManager
 from rsvp.core.text_processor import load_text_from_file
 
 logger = logging.getLogger(__name__)
-
-FILE_DIALOG_FILTER = (
-    "All Supported (*.txt *.md *.html *.htm *.epub *.pdf);;"
-    "Text (*.txt);;"
-    "Markdown (*.md);;"
-    "HTML (*.html *.htm);;"
-    "EPUB (*.epub);;"
-    "PDF (*.pdf);;"
-    "All Files (*)"
-)
 
 
 class DocumentLoader:
@@ -39,7 +30,7 @@ class DocumentLoader:
         on_loaded: Callable[[str | None], None],
         current_file_getter: Callable[[], str | None],
         settings: SettingsManager | None = None,
-    ):
+    ) -> None:
         self._parent = parent_widget
         self._engine = engine
         self._set_status = status_setter
@@ -76,6 +67,7 @@ class DocumentLoader:
             self._settings.add_recent_file(filepath)
         self._set_title(f"RSVP Reader - {filepath}")
         self._set_status(f"Loaded {self._engine.word_count} words")
+        logger.info("Loaded file %s (%d words)", filepath, self._engine.word_count)
         self._on_loaded(filepath)
         self._maybe_resume_position(filepath)
         return True
@@ -105,6 +97,7 @@ class DocumentLoader:
         self._engine.load_text(text)
         self._set_title("RSVP Reader - Clipboard")
         self._set_status(f"Loaded {self._engine.word_count} words from clipboard")
+        logger.info("Loaded clipboard text (%d words)", self._engine.word_count)
         self._on_loaded(None)
         self._engine.play()
 

@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 )
 
 from rsvp.core.constants import FONT_SIZE_MAX, FONT_SIZE_MIN, WPM_MAX, WPM_MIN
-from rsvp.core.settings import SettingsManager, get_settings_manager
+from rsvp.core.settings import SettingsManager
 from rsvp.core.themes import (
     CUSTOM_THEME_SENTINEL,
     DEFAULT_THEME_NAME,
@@ -65,16 +65,16 @@ class ColorButton(QPushButton):
 class SettingsDialog(QDialog):
     """Dialog for application settings."""
 
-    def __init__(self, parent=None, settings: SettingsManager | None = None):
+    def __init__(self, parent=None, *, settings: SettingsManager) -> None:
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(450)
-        # Accept a SettingsManager via DI; fall back to the shim for legacy callers
-        self._settings = settings if settings is not None else get_settings_manager()
+        self._settings = settings
         self._setup_ui()
         self._load_settings()
         # Snapshot for rollback if user clicks Apply then Cancel
         self._original_settings = asdict(self._settings.settings)
+        self._dirty = False  # tracks whether Apply has been clicked
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -139,6 +139,9 @@ class SettingsDialog(QDialog):
         self.auto_save_check = QCheckBox()
         behavior_layout.addRow("Remember reading position:", self.auto_save_check)
 
+        self.tts_check = QCheckBox()
+        behavior_layout.addRow("Text-to-speech:", self.tts_check)
+
         behavior_group.setLayout(behavior_layout)
         layout.addWidget(behavior_group)
 
@@ -153,9 +156,9 @@ class SettingsDialog(QDialog):
         button_box.button(QDialogButtonBox.StandardButton.Apply).clicked.connect(self._apply)
         layout.addWidget(button_box)
 
-    def _load_settings(self):
+    def _load_settings(self) -> None:
         """Load current settings into the dialog."""
-        settings = get_settings_manager().settings
+        settings = self._settings.settings
 
         self.font_combo.setCurrentFont(QFont(settings.font_family))
         self.font_size_spin.setValue(settings.font_size)
@@ -166,6 +169,7 @@ class SettingsDialog(QDialog):
         self.always_on_top_check.setChecked(settings.always_on_top)
         self.pause_paragraphs_check.setChecked(settings.pause_at_paragraphs)
         self.auto_save_check.setChecked(settings.auto_save_position)
+        self.tts_check.setChecked(settings.tts_enabled)
 
         # Theme dropdown: show the stored theme if the values match,
         # otherwise show "Custom" to indicate divergence
@@ -229,10 +233,9 @@ class SettingsDialog(QDialog):
             self.theme_combo.setCurrentText(CUSTOM_THEME_SENTINEL)
             self.theme_combo.blockSignals(False)
 
-    def _apply(self):
+    def _apply(self) -> None:
         """Apply settings without closing."""
-        manager = get_settings_manager()
-        settings = manager.settings
+        settings = self._settings.settings
 
         settings.font_family = self.font_combo.currentFont().family()
         settings.font_size = self.font_size_spin.value()
@@ -243,6 +246,7 @@ class SettingsDialog(QDialog):
         settings.always_on_top = self.always_on_top_check.isChecked()
         settings.pause_at_paragraphs = self.pause_paragraphs_check.isChecked()
         settings.auto_save_position = self.auto_save_check.isChecked()
+        settings.tts_enabled = self.tts_check.isChecked()
 
         # Persist the active theme name (only if the dropdown shows a real theme;
         # "Custom" means the user kept their previous theme_name and tweaked values)
@@ -251,19 +255,22 @@ class SettingsDialog(QDialog):
             settings.theme_name = current_dropdown
         # else: keep settings.theme_name as it was
 
-        manager.save()
+        self._settings.save()
         logger.info("Settings applied")
+        self._dirty = True
 
     def _save_and_accept(self):
         """Save settings and close."""
         self._apply()
         self.accept()
 
-    def reject(self):
+    def reject(self) -> None:
         """Restore original settings on cancel (undoes any Apply clicks)."""
-        manager = get_settings_manager()
         for key, value in self._original_settings.items():
-            if hasattr(manager.settings, key):
-                setattr(manager.settings, key, value)
-        manager.save()
+            if hasattr(self._settings.settings, key):
+                setattr(self._settings.settings, key, value)
+        # Only persist the rollback if the user had actually applied changes;
+        # otherwise the on-disk file already holds the correct values.
+        if self._dirty:
+            self._settings.save()
         super().reject()

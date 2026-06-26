@@ -1,7 +1,9 @@
 """Text processing utilities for RSVP."""
 
+import ipaddress
 import logging
 import re
+import socket
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -15,6 +17,52 @@ from rsvp.core.constants import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Private / reserved IP ranges that should never be fetched (SSRF protection)
+_RESERVED_NETWORKS_V4 = [
+    ipaddress.ip_network("127.0.0.0/8"),  # loopback
+    ipaddress.ip_network("10.0.0.0/8"),  # private
+    ipaddress.ip_network("172.16.0.0/12"),  # private
+    ipaddress.ip_network("192.168.0.0/16"),  # private
+    ipaddress.ip_network("169.254.0.0/16"),  # link-local
+    ipaddress.ip_network("0.0.0.0/8"),  # "this" network
+    ipaddress.ip_network("100.64.0.0/10"),  # carrier-grade NAT (RFC 6598)
+    ipaddress.ip_network("192.0.0.0/24"),  # IETF protocol assignments (RFC 6890)
+]
+_RESERVED_NETWORKS_V6 = [
+    ipaddress.ip_network("::1/128"),  # loopback
+    ipaddress.ip_network("fc00::/7"),  # unique local
+    ipaddress.ip_network("fe80::/10"),  # link-local
+]
+
+
+def _is_reserved_ip(addr: str) -> bool:
+    """Return True if *addr* falls in a private / reserved IP range."""
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return True  # unparseable → treat as reserved
+    if ip.version == 4:
+        return any(ip in net for net in _RESERVED_NETWORKS_V4)
+    # For IPv6, also check IPv4-mapped addresses (e.g. ::ffff:127.0.0.1)
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        return any(ip.ipv4_mapped in net for net in _RESERVED_NETWORKS_V4)
+    return any(ip in net for net in _RESERVED_NETWORKS_V6)
+
+
+def _check_url_not_private(hostname: str) -> None:
+    """Resolve *hostname* and raise ValueError if any result is in a reserved range."""
+    try:
+        addrinfos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror as exc:
+        raise ValueError(f"Could not resolve hostname '{hostname}': {exc}") from exc
+
+    for _family, _type, _proto, _canonname, sockaddr in addrinfos:
+        ip_str = str(sockaddr[0])
+        if _is_reserved_ip(ip_str):
+            raise ValueError(
+                f"URL resolves to a private/reserved IP address ({ip_str}); fetching is not allowed"
+            )
 
 
 @dataclass
@@ -53,16 +101,7 @@ def calculate_orp(word: str) -> int:
     length = len(word)
     if length <= 1:
         return 0
-    elif length <= 3:
-        return 0
-    elif length <= 5:
-        return 1
-    elif length <= 9:
-        return 2
-    elif length <= 13:
-        return 3
-    else:
-        return 4
+    return min(length // 3, 4)
 
 
 def calculate_pause_multiplier(word: str) -> float:
@@ -89,7 +128,7 @@ def calculate_pause_multiplier(word: str) -> float:
 
 
 def strip_markdown(text: str) -> str:
-    """Strip Markdown syntax, keeping readable text."""
+    """Strip Markdown syntax, keeping readable text for RSVP display."""
     # Code blocks (fenced)
     text = re.sub(r"```[\s\S]*?```", "", text)
     # Inline code
@@ -100,19 +139,12 @@ def strip_markdown(text: str) -> str:
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
     # Headers
     text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
-    # Bold + italic combined
-    text = re.sub(r"\*{3}([^*]+)\*{3}", r"\1", text)
-    text = re.sub(r"_{3}([^_]+)_{3}", r"\1", text)
-    # Bold
-    text = re.sub(r"\*{2}([^*]+)\*{2}", r"\1", text)
-    text = re.sub(r"_{2}([^_]+)_{2}", r"\1", text)
-    # Italic
-    text = re.sub(r"\*([^*]+)\*", r"\1", text)
-    text = re.sub(r"_([^_\s]+)_", r"\1", text)
-    # Horizontal rules
+    # Horizontal rules (before bold/italic to avoid false positives on ---)
     text = re.sub(r"^[\-\*_]{3,}\s*$", "", text, flags=re.MULTILINE)
     # HTML tags
     text = re.sub(r"<[^>]+>", "", text)
+    # Strip all markdown formatting characters (*, _, ~, `) but keep content
+    text = re.sub(r"[*_~`]+", "", text)
     return text
 
 
@@ -126,6 +158,9 @@ def process_text(text: str) -> list[Word]:
     """
     if not text or not text.strip():
         return []
+
+    # Normalize CRLF / CR to LF so the paragraph regex matches consistently
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
 
     paragraphs = re.split(r"\n\s*\n", text)
 
@@ -189,24 +224,32 @@ def extract_text_from_html(html: str) -> str:
     return text.strip()
 
 
+def _read_file_with_fallback(filepath: str) -> str:
+    """Read a file as UTF-8, falling back to replacement mode on decode errors."""
+    try:
+        with open(filepath, encoding="utf-8") as f:
+            return f.read()
+    except UnicodeDecodeError:
+        logger.warning("File %s is not valid UTF-8; reading with replacement characters", filepath)
+        with open(filepath, encoding="utf-8", errors="replace") as f:
+            return f.read()
+
+
 def load_text_from_file(filepath: str) -> str:
     """Load text from a file, dispatching by extension."""
     ext = Path(filepath).suffix.lower()
     logger.debug("load_text_from_file dispatch for extension %s", ext or "(none)")
 
     if ext == ".md":
-        with open(filepath, encoding="utf-8") as f:
-            return strip_markdown(f.read())
+        return strip_markdown(_read_file_with_fallback(filepath))
     elif ext in (".html", ".htm"):
-        with open(filepath, encoding="utf-8") as f:
-            return extract_text_from_html(f.read())
+        return extract_text_from_html(_read_file_with_fallback(filepath))
     elif ext == ".epub":
         return load_text_from_epub(filepath)
     elif ext == ".pdf":
         return load_text_from_pdf(filepath)
     else:
-        with open(filepath, encoding="utf-8") as f:
-            return f.read()
+        return _read_file_with_fallback(filepath)
 
 
 def load_text_from_epub(filepath: str) -> str:
@@ -259,7 +302,8 @@ def fetch_text_from_url(url: str) -> str:
 
     Raises ValueError for empty input or non-http(s) schemes (e.g. file://, ftp://,
     javascript:) so that user input cannot be coerced into reading local files or
-    other protocols.
+    other protocols.  Also validates that the resolved IP is not in a private or
+    reserved range (SSRF protection).
     """
     if not url or not url.strip():
         raise ValueError("URL is empty")
@@ -272,6 +316,9 @@ def fetch_text_from_url(url: str) -> str:
         )
     if not parsed.netloc:
         raise ValueError("URL has no host")
+
+    # SSRF protection: verify the hostname doesn't resolve to a private IP
+    _check_url_not_private(parsed.hostname or parsed.netloc)
 
     import requests
 

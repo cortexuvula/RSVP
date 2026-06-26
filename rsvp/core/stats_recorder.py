@@ -57,6 +57,13 @@ class StatsRecorder(QObject):
     def _on_finished(self) -> None:
         self._session_finished = True
         self._end_session()
+        # When the engine reaches the last word, pause() fires before
+        # finished.emit() due to synchronous same-thread signal delivery.
+        # The _end_session() call above is therefore a no-op (session was
+        # already ended by _on_state_changed with finished=False).  Patch
+        # the most recent record to mark it as finished.
+        if self._stats.data.recent_sessions:
+            self._stats.data.recent_sessions[0].finished = True
 
     def _begin_session(self) -> None:
         self._session_start = datetime.now()

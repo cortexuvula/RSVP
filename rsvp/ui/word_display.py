@@ -1,16 +1,20 @@
 """Word display widget with ORP highlighting."""
 
+import logging
+
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from rsvp.core.settings import SettingsManager
 from rsvp.core.text_processor import Word
 
+logger = logging.getLogger(__name__)
+
 
 class ORPWordDisplay(QWidget):
     """Widget that displays a word with ORP (Optimal Recognition Point) highlighting."""
 
-    def __init__(self, parent=None, settings: SettingsManager | None = None):
+    def __init__(self, parent=None, settings: SettingsManager | None = None) -> None:
         super().__init__(parent)
         self._word: Word | None = None
         self._settings = settings
@@ -22,7 +26,7 @@ class ORPWordDisplay(QWidget):
         self.setMinimumHeight(120)
         self._load_settings()
 
-    def _load_settings(self):
+    def _load_settings(self) -> None:
         """Load display settings."""
         if self._settings is None:
             return
@@ -32,17 +36,17 @@ class ORPWordDisplay(QWidget):
         self._orp_color = QColor(settings.orp_color)
         self._bg_color = QColor(settings.background_color)
 
-    def update_settings(self):
+    def update_settings(self) -> None:
         """Reload settings and repaint."""
         self._load_settings()
         self.update()
 
-    def set_word(self, word: Word | None):
+    def set_word(self, word: Word | None) -> None:
         """Set the word to display."""
         self._word = word
         self.update()
 
-    def set_font_size(self, size: int):
+    def set_font_size(self, size: int) -> None:
         """Set the font size."""
         self._font.setPointSize(size)
         self.update()
@@ -107,12 +111,12 @@ class ORPWordDisplay(QWidget):
 class WordDisplayWidget(QWidget):
     """Complete word display widget with surrounding context."""
 
-    def __init__(self, parent=None, settings: SettingsManager | None = None):
+    def __init__(self, parent=None, settings: SettingsManager | None = None) -> None:
         super().__init__(parent)
         self._settings = settings
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -122,10 +126,10 @@ class WordDisplayWidget(QWidget):
 
         self.setLayout(layout)
 
-    def set_word(self, word: Word | None):
+    def set_word(self, word: Word | None) -> None:
         """Set the word to display."""
         self.word_display.set_word(word)
 
-    def update_settings(self):
+    def update_settings(self) -> None:
         """Update display settings."""
         self.word_display.update_settings()

@@ -27,6 +27,7 @@ dependencies = [
     "pyperclip>=1.8.0",
     "ebooklib>=0.18",
     "pymupdf>=1.23.0",
+    "pyttsx3>=2.90",
 ]
 
 [project.optional-dependencies]
@@ -88,4 +89,8 @@ disallow_untyped_defs = false
 disallow_incomplete_defs = false
 # PyQt6 stubs return QMenuBar | None / QMenu | None for some methods that
 # never actually return None at runtime; suppress the spurious union-attr
+# errors that result. Third-party libs (pyperclip, pyttsx3, requests,
+# fitz/pymupdf) don't ship type stubs — import-untyped covers the
+# residual for libs that ARE installed but lack py.typed. Real type
+# errors still surface.
 disable_error_code = ["union-attr", "import-untyped"]

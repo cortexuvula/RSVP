@@ -4,6 +4,7 @@ import pytest
 
 from rsvp.core.rsvp_engine import RSVPEngine, RSVPState
 from rsvp.core.text_processor import process_text
+from tests.conftest import force_playing
 
 
 class TestRSVPState:
@@ -391,7 +392,7 @@ class TestRSVPEngineAdvance:
         engine.seek(1)  # at last word
         finished = []
         engine.finished.connect(lambda: finished.append(True))
-        engine._state.is_playing = True  # simulate playing state for pause()
+        force_playing(engine)  # simulate playing state for pause()
         engine._advance()
         assert len(finished) == 1
 
@@ -399,7 +400,7 @@ class TestRSVPEngineAdvance:
         engine = RSVPEngine()
         engine.load_text("one two")
         engine.seek(1)
-        engine._state.is_playing = True
+        force_playing(engine)
         engine._advance()
         assert engine.is_playing is False
 
@@ -407,7 +408,7 @@ class TestRSVPEngineAdvance:
         engine = RSVPEngine()
         engine.load_text("one two")
         engine.seek(1)
-        engine._state.is_playing = True
+        force_playing(engine)
         engine._advance()
         assert engine.current_index == 1  # stays at last, not beyond
 
@@ -417,7 +418,7 @@ class TestRSVPEngineAdvance:
         engine.seek(1)
         progress = []
         engine.progress_changed.connect(lambda p: progress.append(p))
-        engine._state.is_playing = True
+        force_playing(engine)
         engine._advance()
         assert progress[-1] == 100.0
 
@@ -430,7 +431,7 @@ class TestRSVPEngineAdvance:
         finished = []
         engine.finished.connect(lambda: finished.append(True))
 
-        engine._state.is_playing = True
+        force_playing(engine)
         engine._advance()  # index 0 -> 1
         engine._advance()  # index 1 -> 2
         engine._advance()  # index 2 -> 3 (past end) -> finish
