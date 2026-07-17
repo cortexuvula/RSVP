@@ -1,5 +1,7 @@
 """Smoke tests for the SettingsDialog theme integration."""
 
+from unittest.mock import patch
+
 import pytest
 
 from rsvp.core.settings import RSVPSettings, SettingsManager
@@ -59,10 +61,18 @@ class TestSettingsDialogTheme:
         assert dlg.bg_color_btn.get_color().lower() == light.background_color.lower()
 
     def test_selecting_theme_updates_font(self, qapp, isolated_settings):
+        # Verify the dialog *requests* the theme's font via setCurrentFont,
+        # rather than asserting on currentFont().family() — the latter reflects
+        # OS font availability, and CI Windows runners don't ship "Georgia",
+        # so Qt substitutes a fallback (e.g. "Sans Serif") even though the
+        # dialog correctly requested the theme font.
         dlg = SettingsDialog(settings=isolated_settings)
-        dlg.theme_combo.setCurrentText("Sepia")
         sepia = get_theme("Sepia")
-        assert dlg.font_combo.currentFont().family() == sepia.font_family
+        with patch.object(dlg.font_combo, "setCurrentFont") as mock_set:
+            dlg.theme_combo.setCurrentText("Sepia")
+        mock_set.assert_called_once()
+        requested_family = mock_set.call_args[0][0].family()
+        assert requested_family == sepia.font_family
 
     def test_manual_color_edit_shows_custom(self, qapp, isolated_settings):
         dlg = SettingsDialog(settings=isolated_settings)
