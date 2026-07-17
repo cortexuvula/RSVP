@@ -9,6 +9,7 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 
 from rsvp import __version__
+from rsvp.core.settings import SettingsManager
 from rsvp.ui.main_window import MainWindow
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,11 @@ def main() -> None:
     # Enable high DPI scaling
     app.setStyle("Fusion")
 
-    window = MainWindow()
+    # Settings are constructed once at the app entry point and threaded down
+    # to MainWindow and its children (RSVPEngine, DocumentLoader, etc.) via
+    # dependency injection — no module-level singleton.
+    settings = SettingsManager()
+    window = MainWindow(settings=settings)
     window.show()
 
     sys.exit(app.exec())

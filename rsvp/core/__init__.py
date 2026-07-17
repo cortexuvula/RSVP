@@ -23,7 +23,6 @@ from rsvp.core.rsvp_engine import RSVPEngine, RSVPState
 from rsvp.core.settings import (
     RSVPSettings,
     SettingsManager,
-    get_settings_manager,
 )
 from rsvp.core.stats import (
     AllTimeStats,
@@ -100,7 +99,6 @@ __all__ = [
     "create_tts_driver",
     "extract_text_from_html",
     "fetch_text_from_url",
-    "get_settings_manager",
     "get_theme",
     "load_text_from_file",
     "process_text",
