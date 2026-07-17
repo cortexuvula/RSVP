@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] - 2026-07-17
+
+### Fixed
+- TTS stop race: `set_enabled(False)` and pause/stop now call `_worker.stop()` directly instead of via a queued signal. The queued signal could never interrupt the worker while it was blocked inside `pyttsx3.runAndWait()`, so disabling TTS mid-utterance failed until the utterance finished on its own. Aligns with the proven `shutdown()` pattern.
+- `_toggle_always_on_top` signature mismatch with the `MenuHost` protocol — the method ignored the `checked` bool Qt passes via `triggered(bool)` and re-read `isChecked()` instead, then persisted a stale value.
+- Theme-font test no longer depends on OS font availability (CI Windows runners don't ship "Georgia"); now asserts the dialog *requests* the theme's font via `setCurrentFont`.
+- URL fetch failures now log the full traceback at the point of failure in `_FetchWorker.run()`, so errors are traceable even if the worker thread is torn down before the error signal is delivered.
+
+### Changed
+- Pin major-version upper bounds on all runtime dependencies (`PyQt6<7`, `requests<3`, `beautifulsoup4<5`, `pyperclip<2`, `ebooklib<1`, `pymupdf<2`, `pyttsx3<3`) so breaking releases can't silently land via `pip install`.
+- Remove the dead `get_settings_manager()` singleton (zero production call sites since the Spec 2 DI refactor). Settings are now constructed once at the app entry point in `main.py` and threaded down via dependency injection.
+- `MenuHost.engine` declared as a read-only `@property` in the protocol to match `MainWindow`'s existing exposure.
+
+### Added
+- mypy type-checking step in the CI lint job (catches signature/None-safety issues that type hints are meant to prevent).
+- Python 3.10 and 3.12 added to the CI test matrix (previously only 3.11), matching the versions declared in `pyproject.toml`.
+- `SECURITY.md` documenting how to report vulnerabilities privately via GitHub advisories, with response-time commitments and the security-relevant attack surface (SSRF-hardened URL fetching, file parsing, atomic persistence).
+- README now documents TTS, reading statistics, theme presets, and the full keyboard shortcuts table (including Ctrl+Shift+O, Ctrl+Shift+B, Ctrl+Q, F1).
+
+### CI/Dependencies
+- Consolidated bump of all GitHub Actions to latest versions: `actions/checkout` v6, `actions/setup-python` v6, `actions/upload-artifact` v7, `actions/download-artifact` v8, `codecov/codecov-action` v6. Closed 5 stale Dependabot PRs.
+- Lint job now installs project dependencies so mypy checks against real types (PyQt6, etc.) rather than treating them as `Any`.
+
 ## [1.5.0] - 2026-06-11
 
 ### Added
