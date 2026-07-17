@@ -107,8 +107,6 @@ class TTSController(QObject):
 
     # Internal signal used to dispatch work to the worker thread.
     _speak_requested = pyqtSignal(str)
-    # Signal to request stop on the worker thread
-    _stop_requested = pyqtSignal()
 
     def __init__(self, engine: RSVPEngine, driver: TTSDriver | None = None) -> None:
         super().__init__()
@@ -123,7 +121,6 @@ class TTSController(QObject):
 
         # Internal signal: queued connection so speak() runs in the worker thread
         self._speak_requested.connect(self._worker.speak)
-        self._stop_requested.connect(self._worker.stop)
 
         self._worker.finished.connect(self._on_tts_finished)
         self._worker.error.connect(self._on_tts_error)
@@ -141,7 +138,14 @@ class TTSController(QObject):
         """User toggled TTS in Settings. Stops any current utterance if disabling."""
         self._enabled = enabled
         if not enabled:
-            self._stop_requested.emit()
+            # Call stop directly on the worker. A queued _stop_requested signal
+            # would not be delivered until the worker's event loop runs again,
+            # but the worker blocks inside pyttsx3.runAndWait() with its loop
+            # stalled — so the signal can never interrupt an in-progress
+            # utterance. pyttsx3.stop() is designed to be called from another
+            # thread to unblock runAndWait(); the same approach is already used
+            # in shutdown().
+            self._worker.stop()
 
     def shutdown(self) -> None:
         """Interrupt any in-progress utterance and stop the background thread."""
@@ -162,7 +166,9 @@ class TTSController(QObject):
         if not self._enabled:
             return
         if not self._engine.is_playing:
-            self._stop_requested.emit()
+            # See set_enabled(): direct call is required because the worker
+            # blocks inside runAndWait() and cannot process a queued signal.
+            self._worker.stop()
 
     def _on_tts_finished(self) -> None:
         """Word finished speaking – no-op (engine timer paces the next word)."""

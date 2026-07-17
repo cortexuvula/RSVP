@@ -66,8 +66,7 @@ class TestTTSController:
         ctrl.set_enabled(True)
         mock_driver.reset_mock()
         ctrl.set_enabled(False)
-        # Process events so the queued _stop_requested signal reaches the worker thread
-        qapp.processEvents()
+        # set_enabled(False) calls _worker.stop() directly (synchronous)
         mock_driver.stop.assert_called()
         ctrl.shutdown()
 
@@ -114,8 +113,7 @@ class TestTTSController:
         mock_driver.reset_mock()
         engine.play()
         engine.pause()
-        # Process events so the queued _stop_requested signal reaches the worker thread
-        qapp.processEvents()
+        # Pausing calls _worker.stop() directly (synchronous)
         mock_driver.stop.assert_called()
         ctrl.shutdown()
 
@@ -138,8 +136,7 @@ class TestTTSController:
         assert ctrl.enabled
         mock_driver.reset_mock()
         ctrl.shutdown()
-        # shutdown() calls _stop_requested.emit() (queued) then thread.quit()+wait()
-        # The wait() should ensure the worker processes the stop signal
+        # shutdown() calls _worker.stop() directly, then thread.quit()+wait()
         mock_driver.stop.assert_called()
 
 
