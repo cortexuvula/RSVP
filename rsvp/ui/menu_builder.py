@@ -13,7 +13,8 @@ from rsvp.core.rsvp_engine import RSVPEngine
 class MenuHost(Protocol):
     """Interface that MenuBuilder expects from its host object."""
 
-    engine: RSVPEngine
+    @property
+    def engine(self) -> RSVPEngine: ...
 
     def _load_text_dialog(self) -> None: ...
     def _open_file(self) -> None: ...

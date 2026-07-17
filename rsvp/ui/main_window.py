@@ -281,14 +281,13 @@ class MainWindow(QMainWindow):
             self._apply_settings()
             self.speed_control.set_wpm(self._settings.settings.wpm)
 
-    def _toggle_always_on_top(self) -> None:
+    def _toggle_always_on_top(self, checked: bool) -> None:
         """Toggle always on top."""
-        on_top = self.always_on_top_action.isChecked()
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, on_top)
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, checked)
         self.show()
 
         manager = self._settings
-        manager.settings.always_on_top = on_top
+        manager.settings.always_on_top = checked
         manager.save()
 
     def _toggle_fullscreen(self) -> None:
