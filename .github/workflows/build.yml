@@ -20,8 +20,8 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install ruff and mypy
-        run: pip install ruff mypy
+      - name: Install ruff, mypy, and project dependencies
+        run: pip install ruff mypy -e ".[dev]"
 
       - name: Run ruff check
         run: ruff check .
