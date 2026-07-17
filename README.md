@@ -167,3 +167,7 @@ Each word has an Optimal Recognition Point - the character position where the ey
 ## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+## Security
+
+Found a security issue? See [SECURITY.md](SECURITY.md) for how to report it privately.

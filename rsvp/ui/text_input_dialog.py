@@ -40,6 +40,11 @@ class _FetchWorker(QObject):
             text = fetch_text_from_url(self._url)
             self.finished.emit(text)
         except Exception as e:
+            # Log the full traceback at the point of failure. The error signal
+            # carries only str(e) to the UI; if the thread is torn down before
+            # the (queued) signal is delivered, this log record is the only
+            # trace of what went wrong.
+            logger.warning("URL fetch failed for %s", self._url, exc_info=True)
             self.error.emit(str(e))
 
 
